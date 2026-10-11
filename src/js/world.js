@@ -330,7 +330,7 @@ const WORLD = (function () {
     INK.wpoly(c, [[-10, -33], [10, -33], [d * 4, -60]], "#ff5a5a", true, 73, 0.8);
     c.restore();
   }
-  function gardenGround(c, W, H, cx, y0, t, hwB) {
+  function gardenGround(c, W, H, cx, y0, t, hwB, zoom) {
     c.fillStyle = "#7a4c2c"; c.fillRect(0, y0, W, Math.max(0, H - y0) + 4);
     for (let i = -24; i <= 24; i++) {
       const x = cx + i * 53 + hr(i, 1) * 30; if (x < -10 || x > W + 10) continue;
@@ -348,9 +348,11 @@ const WORLD = (function () {
       const sw = Math.sin(t * 1.4 + i) * 1.5;
       c.beginPath(); c.moveTo(x - 3, y0 + 2); c.lineTo(x - 4 + sw, y0 - 9); c.moveTo(x + 2, y0 + 2); c.lineTo(x + 4 + sw, y0 - 7); c.stroke();
     }
-    const hx = cx - hwB - 150, gx = cx + hwB + 62;   // house + gnome stand just beyond the mountain's foot
-    if (hx > -90) cottage(c, hx, y0 + 2, t);
-    if (gx < W + 30) gnome(c, gx, y0 + 2, cx, t);
+    // house + gnome stand just beyond the mountain's foot; when zoomed far out they grow so they stay visible
+    const k = Math.max(1, Math.min(10, 0.42 / zoom));
+    const hx = cx - hwB - 150 * k, gx = cx + hwB + 62 * k;
+    if (hx > -90 * k) { c.save(); c.translate(hx, y0 + 2); c.scale(k, k); cottage(c, 0, 0, t); c.restore(); }
+    if (gx < W + 30 * k) { c.save(); c.translate(gx, y0 + 2); c.scale(k, k); gnome(c, 0, 0, (cx - gx) / k, t); c.restore(); }
   }
   function stratCol(i, s) {
     const key = i + "|" + (s.hue | 0);
@@ -528,7 +530,7 @@ const WORLD = (function () {
     if (yTop > H + 90) return;
     c.save(); c.lineCap = "round"; c.lineJoin = "round";
     const hwB = top > 0 ? mhw(top) : 30;
-    if (y0 < H + 160) gardenGround(c, W, H, cx, y0, t, hwB);
+    if (y0 < H + 160) gardenGround(c, W, H, cx, y0, t, hwB, v.zoom || 1);
     if (top > 0) mound(c, v, S, W, H, cx, y0, top, t, sl);
     c.restore();
   }

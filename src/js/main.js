@@ -45,7 +45,7 @@ const MAIN = {
       [["Nice", () => { SFX.play("coin"); }, "green"]]);
   },
   vis() {
-    if (document.hidden) { MAIN.hiddenAt = Date.now(); if (G.started) STATE.save(G.S); }
+    if (document.hidden) { MAIN.hiddenAt = Date.now(); if (G.started && !G.wiping) STATE.save(G.S); }   // never undo a wipe/import
     else if (MAIN.hiddenAt && G.started) {
       const sec = (Date.now() - MAIN.hiddenAt) / 1000; MAIN.hiddenAt = 0;
       MAIN.last = performance.now();
@@ -73,8 +73,10 @@ const MAIN = {
     if (G.started) {
       if (!CINE.active) { GAME.step(dt); QUESTS.update(dt); }
       // camera (zooms out while you look down into the compost mountain)
-      G.zoom += (GAME.zoomTarget() - G.zoom) * Math.min(1, dt * 5);
-      if (Math.abs(G.zoom - GAME.zoomTarget()) < 0.002) G.zoom = GAME.zoomTarget();
+      // eased, and never faster than ~1.8x per second, so leaving the mountain zooms back in gently
+      const zt = GAME.zoomTarget(), lim = Math.pow(1.8, dt);
+      G.zoom = U.clamp(G.zoom + (zt - G.zoom) * Math.min(1, dt * 2), G.zoom / lim, G.zoom * lim);
+      if (Math.abs(G.zoom - zt) < 0.002) G.zoom = zt;
       G.vW = G.W / G.zoom; G.vH = G.H / G.zoom;
       const mx = GAME.camMax();
       if (G.follow) G.cam += (GAME.camFollow() - G.cam) * Math.min(1, dt * 3);

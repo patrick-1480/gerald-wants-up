@@ -32,9 +32,18 @@ const GAME = {
   },
   /* zoom target: 1 normally, zooming out as the view sinks below the mountain top */
   zoomTop: () => (G.W < 520 ? 0.85 : 1),      // normal zoom: phones draw the world a bit smaller so more fits
+  /* zoom follows the mountain's real width (world.js: half-width = 46 + 13.5*sqrt(depth below summit)), so it
+     changes gradually as you scroll: the mountain never fills more than 2/3 of the screen (1/6 free each side),
+     and near the bottom it zooms out far enough to show the house and Gnome Dave beside it */
   zoomTarget() {
-    const d = GAME.mtnTop() - G.cam, minZ = U.clamp(G.H / (GAME.mtnTop() + 800), 0.3, 1);
-    return Math.min(GAME.zoomTop(), U.clamp(1 - Math.max(0, d - 350) / 1500, minZ, 1));
+    const top = GAME.zoomTop(), mt = GAME.mtnTop();
+    if (mt <= 0) return top;
+    const hwAt = d => 46 + 13.5 * Math.sqrt(Math.max(0, d)) + 12;
+    let need = 3 * hwAt(U.clamp(mt - G.cam, 0, mt));
+    const nearGround = U.clamp((420 - G.cam) / 360, 0, 1);              // fades in as the garden comes into view
+    const k = Math.max(1, Math.min(10, 0.42 / Math.max(0.05, G.zoom)));   // matches the house/gnome scaling in world.js
+    need = U.lerp(need, Math.max(need, 2 * hwAt(mt) + 460 * k), nearGround);
+    return U.clamp(G.W / need, 0.05, top);
   },
 
   /* ---------- plant identity (new weird plants every run; past runs are remembered for the mountain) ---------- */

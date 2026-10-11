@@ -5018,7 +5018,7 @@ const WORLD = (function () {
     INK.wpoly(c, [[-10, -33], [10, -33], [d * 4, -60]], "#ff5a5a", true, 73, 0.8);
     c.restore();
   }
-  function gardenGround(c, W, H, cx, y0, t, hwB) {
+  function gardenGround(c, W, H, cx, y0, t, hwB, zoom) {
     c.fillStyle = "#7a4c2c"; c.fillRect(0, y0, W, Math.max(0, H - y0) + 4);
     for (let i = -24; i <= 24; i++) {
       const x = cx + i * 53 + hr(i, 1) * 30; if (x < -10 || x > W + 10) continue;
@@ -5036,9 +5036,11 @@ const WORLD = (function () {
       const sw = Math.sin(t * 1.4 + i) * 1.5;
       c.beginPath(); c.moveTo(x - 3, y0 + 2); c.lineTo(x - 4 + sw, y0 - 9); c.moveTo(x + 2, y0 + 2); c.lineTo(x + 4 + sw, y0 - 7); c.stroke();
     }
-    const hx = cx - hwB - 150, gx = cx + hwB + 62;   // house + gnome stand just beyond the mountain's foot
-    if (hx > -90) cottage(c, hx, y0 + 2, t);
-    if (gx < W + 30) gnome(c, gx, y0 + 2, cx, t);
+    // house + gnome stand just beyond the mountain's foot; when zoomed far out they grow so they stay visible
+    const k = Math.max(1, Math.min(10, 0.42 / zoom));
+    const hx = cx - hwB - 150 * k, gx = cx + hwB + 62 * k;
+    if (hx > -90 * k) { c.save(); c.translate(hx, y0 + 2); c.scale(k, k); cottage(c, 0, 0, t); c.restore(); }
+    if (gx < W + 30 * k) { c.save(); c.translate(gx, y0 + 2); c.scale(k, k); gnome(c, 0, 0, (cx - gx) / k, t); c.restore(); }
   }
   function stratCol(i, s) {
     const key = i + "|" + (s.hue | 0);
@@ -5216,7 +5218,7 @@ const WORLD = (function () {
     if (yTop > H + 90) return;
     c.save(); c.lineCap = "round"; c.lineJoin = "round";
     const hwB = top > 0 ? mhw(top) : 30;
-    if (y0 < H + 160) gardenGround(c, W, H, cx, y0, t, hwB);
+    if (y0 < H + 160) gardenGround(c, W, H, cx, y0, t, hwB, v.zoom || 1);
     if (top > 0) mound(c, v, S, W, H, cx, y0, top, t, sl);
     c.restore();
   }
@@ -6949,9 +6951,18 @@ const GAME = {
   },
   /* zoom target: 1 normally, zooming out as the view sinks below the mountain top */
   zoomTop: () => (G.W < 520 ? 0.85 : 1),      // normal zoom: phones draw the world a bit smaller so more fits
+  /* zoom follows the mountain's real width (world.js: half-width = 46 + 13.5*sqrt(depth below summit)), so it
+     changes gradually as you scroll: the mountain never fills more than 2/3 of the screen (1/6 free each side),
+     and near the bottom it zooms out far enough to show the house and Gnome Dave beside it */
   zoomTarget() {
-    const d = GAME.mtnTop() - G.cam, minZ = U.clamp(G.H / (GAME.mtnTop() + 800), 0.3, 1);
-    return Math.min(GAME.zoomTop(), U.clamp(1 - Math.max(0, d - 350) / 1500, minZ, 1));
+    const top = GAME.zoomTop(), mt = GAME.mtnTop();
+    if (mt <= 0) return top;
+    const hwAt = d => 46 + 13.5 * Math.sqrt(Math.max(0, d)) + 12;
+    let need = 3 * hwAt(U.clamp(mt - G.cam, 0, mt));
+    const nearGround = U.clamp((420 - G.cam) / 360, 0, 1);              // fades in as the garden comes into view
+    const k = Math.max(1, Math.min(10, 0.42 / Math.max(0.05, G.zoom)));   // matches the house/gnome scaling in world.js
+    need = U.lerp(need, Math.max(need, 2 * hwAt(mt) + 460 * k), nearGround);
+    return U.clamp(G.W / need, 0.05, top);
   },
 
   /* ---------- plant identity (new weird plants every run; past runs are remembered for the mountain) ---------- */
@@ -9639,7 +9650,7 @@ const MAIN = {
       [["Nice", () => { SFX.play("coin"); }, "green"]]);
   },
   vis() {
-    if (document.hidden) { MAIN.hiddenAt = Date.now(); if (G.started) STATE.save(G.S); }
+    if (document.hidden) { MAIN.hiddenAt = Date.now(); if (G.started && !G.wiping) STATE.save(G.S); }   // never undo a wipe/import
     else if (MAIN.hiddenAt && G.started) {
       const sec = (Date.now() - MAIN.hiddenAt) / 1000; MAIN.hiddenAt = 0;
       MAIN.last = performance.now();
@@ -9667,8 +9678,10 @@ const MAIN = {
     if (G.started) {
       if (!CINE.active) { GAME.step(dt); QUESTS.update(dt); }
       // camera (zooms out while you look down into the compost mountain)
-      G.zoom += (GAME.zoomTarget() - G.zoom) * Math.min(1, dt * 5);
-      if (Math.abs(G.zoom - GAME.zoomTarget()) < 0.002) G.zoom = GAME.zoomTarget();
+      // eased, and never faster than ~1.8x per second, so leaving the mountain zooms back in gently
+      const zt = GAME.zoomTarget(), lim = Math.pow(1.8, dt);
+      G.zoom = U.clamp(G.zoom + (zt - G.zoom) * Math.min(1, dt * 2), G.zoom / lim, G.zoom * lim);
+      if (Math.abs(G.zoom - zt) < 0.002) G.zoom = zt;
       G.vW = G.W / G.zoom; G.vH = G.H / G.zoom;
       const mx = GAME.camMax();
       if (G.follow) G.cam += (GAME.camFollow() - G.cam) * Math.min(1, dt * 3);
