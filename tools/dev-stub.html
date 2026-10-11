@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Gerald Wants Up</title>
+<meta name="description" content="A weird idle game about a beanstalk with a grievance.">
+<meta name="theme-color" content="#1d0f2b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gerald">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chewy&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../src/css/style.css?v=mv41oszn">
+</head>
+<body>
+<div id="app">
+  <main id="stage">
+    <canvas id="c"></canvas>
+    <div id="hud">
+      <div id="hudLeft" class="card">
+        <div id="hudMoney" class="money">$0</div>
+        <div class="sub"><span id="hudIps">$0</span>/sec</div>
+        <div class="chips">
+          <span id="hudSocks" class="chip" title="Socks: catch them, spend them on automation">🧦 <b id="hudSockN">0</b></span>
+          <span id="hudMulch" class="chip" title="Mulch: from composting, spend on permanent perks">🪱 <b id="hudMulchN">0</b></span>
+        </div>
+        <div id="hudBuffs"></div>
+      </div>
+      <button id="objective" class="card" title="Your goal">
+        <div class="objTop"><span class="objIcon">🎯</span><span id="objText">Gerald wants up.</span></div>
+        <div class="bar"><i id="objBar"></i></div>
+        <div id="objSub" class="sub"></div>
+      </button>
+      <div id="hudRight">
+        <button id="btnUp" class="round" title="Follow Gerald">⬆</button>
+        <button id="btnDown" class="round" title="Scroll to the ground">⬇</button>
+        <button id="btnMute" class="round" title="Sound on/off">🔊</button>
+      </div>
+      <div id="altMeter" title="Altitude"><div id="altTrack"></div></div>
+      <div id="ticker"><b>SKY NEWS</b><span id="tickerText"></span></div>
+    </div>
+    <div id="plantMenu" class="pop hidden"></div>
+    <div id="tutor" class="hidden">
+      <canvas id="tutFace" width="96" height="96"></canvas>
+      <div class="tutBody"><b>Wormsley</b><p id="tutText"></p><div id="tutBtns"></div></div>
+    </div>
+    <div id="tutArrow" class="hidden"></div>
+  </main>
+  <aside id="panel">
+    <nav id="tabs">
+      <button data-tab="grow" class="on">🌱<span>Garden</span></button>
+      <button data-tab="quests" id="tabQuests">📜<span>Quests</span><em id="qBadge"></em></button>
+      <button data-tab="compost" id="tabCompost">🪱<span>Compost</span><em id="cBadge"></em></button>
+      <button data-tab="stuff">🎒<span>Stuff</span></button>
+      <button data-tab="settings">⚙️<span>Settings</span></button>
+    </nav>
+    <section class="tab on" id="tab-grow"></section>
+    <section class="tab" id="tab-quests"></section>
+    <section class="tab" id="tab-compost"></section>
+    <section class="tab" id="tab-stuff"></section>
+    <section class="tab" id="tab-settings"></section>
+    <div id="sheetGrab" style="display:none"><button id="sheetClose" title="Open / close">▴</button></div>
+  </aside>
+</div>
+<div id="toasts"></div>
+<div id="modal" class="hidden"><div class="box"><div id="modalBody"></div></div></div>
+<div id="title">
+  <canvas id="titleCanvas"></canvas>
+  <div class="titleUi">
+    <h1 class="logo"><span>Gerald</span> <span>Wants</span> <span>Up</span></h1>
+    <p class="tag">a game about a beanstalk with a grievance</p>
+    <button id="btnPlay" class="big">Play</button>
+    <p class="fine" id="titleFine"></p>
+  </div>
+</div>
+<script src="../src/js/econ.js?v=mv41oszn"></script>
+<script src="../src/js/data.js?v=mv41oszn"></script>
+<script src="../src/js/ink.js?v=mv41oszn"></script>
+<script src="../src/js/util.js?v=mv41oszn"></script>
+<script src="../src/js/zones.js?v=mv41oszn"></script>
+<script src="../src/js/audio.js?v=mv41oszn"></script>
+<script src="../src/js/draw.js?v=mv41oszn"></script>
+<script src="../src/js/icons.js?v=mv41oszn"></script>
+<script src="../src/js/world.js?v=mv41oszn"></script>
+<script>
+if (typeof DRAW === "undefined") window.DRAW = {
+  plant(c, p, o) { const g = o.grow || 1, w = o.wob || 0; c.strokeStyle = INK.C.ink; c.lineWidth = 3; c.scale(g * (1 + w * .2), g * (1 - w * .2));
+    INK.blob(c, 0, 0, 26, 24, p.c1, true, p.seed); INK.blob(c, 0, -26, 14, 10, p.c2, true, p.seed + 1);
+    for (let k = 0; k < p.eyes; k++) INK.eye(c, (k - (p.eyes - 1) / 2) * 13, -2, 6, o.look); INK.label(c, p.type, 0, 20, 10, "#fff"); },
+  gerald(c, o) { c.strokeStyle = INK.C.ink; c.lineWidth = 3; INK.blob(c, 0, 0, 36, 30, "#6bd36b", true, 1); INK.eye(c, -13, -6, 10, o.look, { blink: o.blink }); INK.eye(c, 13, -6, 10, o.look, { blink: o.blink });
+    INK.oval(c, 0, 14, 8, 2 + (o.spit || 0) * 8, "#5a1030", true); INK.label(c, o.hat || "", 0, -36, 12, "#ffd23f"); },
+  hat() {}, bean(c, g) { c.strokeStyle = INK.C.ink; c.lineWidth = 2; INK.oval(c, 0, 0, 5, 7, g ? "#ffd23f" : "#b5763a", true); },
+  sock(c) { c.strokeStyle = INK.C.ink; c.lineWidth = 2; INK.oval(c, 0, 0, 9, 15, "#ff7eb6", true); },
+  bubble(c, r) { c.strokeStyle = INK.C.ink; c.lineWidth = 2; INK.oval(c, 0, 0, r, r, "rgba(190,230,255,.55)", true); INK.label(c, "$", 0, 6, 16, "#ffd23f"); },
+  coin(c, r) { c.strokeStyle = INK.C.ink; c.lineWidth = 2; INK.oval(c, 0, 0, r, r, "#ffd23f", true); },
+  visitor(c, v) { c.strokeStyle = INK.C.ink; c.lineWidth = 3; INK.blob(c, 0, 0, 30, 30, v.col, true, 3); INK.label(c, v.body, 0, 5, 12, "#000"); },
+  worm(c) {}, moonFace(c, r) { c.strokeStyle = INK.C.ink; c.lineWidth = 3; INK.oval(c, 0, 0, r, r, "#fff3c4", true); },
+  portrait(c, k, s) { c.strokeStyle = INK.C.ink; c.lineWidth = 3; INK.oval(c, 0, 0, s * .4, s * .4, "#ff9fb0", true); INK.label(c, k, 0, 5, 12, "#000"); },
+};
+if (typeof CINE === "undefined") window.CINE = { active: false, play(id, p, cb) { console.log("[stub CINE]", id, p && p.zone ? p.zone.name : ""); setTimeout(() => cb && cb(), 0); } };
+if (typeof WORLD === "undefined") window.WORLD = {
+  sky(c, W, H, alt) { const z = ZONES.get(ECON.zoneOf(Math.max(0, alt))), g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, z.sky[0]); g.addColorStop(1, z.sky[1]); c.fillStyle = g; c.fillRect(0, 0, W, H); },
+  ground(c, v) { const y = v.toY(0), t = v.toY(G.S.mtn * v.gap); c.fillStyle = "#6b4226"; c.fillRect(0, y, v.W, v.H); c.fillRect(v.cx - 160, t, 320, y - t); },
+  landmarks() {}, overlay() {},
+};
+</script>
+<script src="../src/js/state.js?v=mv41oszn"></script>
+<script src="../src/js/quests.js?v=mv41oszn"></script>
+<script src="../src/js/game.js?v=mv41oszn"></script>
+<script src="../src/js/cutscene.js?v=mv41oszn"></script>
+<script src="../src/js/tutorial.js?v=mv41oszn"></script>
+<script src="../src/js/ui.js?v=mv41oszn"></script>
+<script src="../src/js/main.js?v=mv41oszn"></script>
+</body>
+</html>

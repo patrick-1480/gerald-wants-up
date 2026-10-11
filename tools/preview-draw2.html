@@ -1,0 +1,94 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>DRAW plants preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Chewy&family=Gaegu:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#8fd0f5;font-family:Gaegu,sans-serif}
+  #bar{position:sticky;top:0;z-index:2;background:#1d0f2b;color:#fff3dc;padding:6px 10px;font:16px Chewy,cursive}
+  #bar label,#bar button{margin-right:12px}
+  canvas{display:block}
+</style></head><body>
+<div id="bar">Plant variety preview &mdash;
+  <label><select id="mode"><option value="rand">60 random plants</option><option value="type">by type (14 x 8)</option><option value="hit">random, hit/sad/talk</option></select></label>
+  <button id="reseed">reseed</button>
+  <label><input type="checkbox" id="mark"> mark (0,44)</label>
+  <label><input type="checkbox" id="dark"> dark bg</label>
+  <span id="fps"></span></div>
+<canvas id="c"></canvas>
+<script>
+/* cache-busted loads so edits to draw.js always show up */
+["econ", "data", "ink", "util", "zones", "draw"].forEach(n => document.write('<script src="../src/js/' + n + '.js?v=' + Date.now() + '"></scr' + 'ipt>'));
+</script>
+<script>
+var G = { S: { zone: 0, u: 0, settings: {}, hat: "none" }, mouse: { x: 0, y: 0, in: true }, T: 0, W: 0, H: 0 };
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+const TYPES = DATA.SPECIES.map(s => s.t), ES = ["round", "round", "sleepy", "wide", "side", "spiral"];
+const MS = ["smile", "smile", "flat", "o", "teeth", "tongue", "wobbly"];
+const AC = ["tophat", "bow", "glasses", "monocle", "mustache", "unibrow", "flower", "bandaid", "earring"];
+let W = 1320, H = 900, dpr = 1, base = 1, plants = [], Z = +(new URLSearchParams(location.search).get('z') || 1);
+function desc(ty, r, i) {
+  const hue = Math.floor(r() * 360);
+  return { i, name: ty, type: ty, hue, c1: INK.hsl(hue, 72, 66), c2: INK.hsl((hue + 120 + r() * 120) % 360, 75, 60),
+    eyes: r() < 0.15 ? 1 : r() < 0.8 ? 2 : 3, eyeStyle: ES[Math.floor(r() * ES.length)], mouth: MS[Math.floor(r() * MS.length)],
+    acc: r() < 0.5 ? "none" : AC[Math.floor(r() * AC.length)], pt: 5 + Math.floor(r() * 5), seed: Math.floor(r() * 1e6) };
+}
+function build() {
+  const mode = document.getElementById("mode").value, r = U.rng(base * 7919 + 1);
+  plants = [];
+  if (mode === "type") {
+    for (let ti = 0; ti < 14; ti++) for (let k = 0; k < 8; k++) plants.push({ p: desc(TYPES[ti], r, ti * 8 + k), x: 80 + k * 150, y: 70 + ti * 135, d: k & 1 ? 1 : -1 });
+    H = 70 + 14 * 135;
+  } else {
+    for (let i = 0; i < 60; i++) plants.push({ p: desc(TYPES[i % 14], r, i), x: 80 + (i % 10) * 128, y: 75 + Math.floor(i / 10) * 140, d: i & 1 ? 1 : -1 });
+    H = 75 + 6 * 140;
+  }
+  resize();
+}
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  cv.style.width = W * Z + "px"; cv.style.height = H * Z + "px"; cv.width = W * Z * dpr; cv.height = H * Z * dpr; G.W = W * Z; G.H = H * Z;
+}
+document.getElementById("mode").onchange = build;
+document.getElementById("reseed").onclick = () => { base++; build(); };
+cv.addEventListener("mousemove", e => { const r = cv.getBoundingClientRect(); G.mouse.x = e.clientX - r.left; G.mouse.y = e.clientY - r.top; });
+window.view = z => { Z = z; resize(); render(performance.now() / 1000); };
+let BIG = null;
+window.big = (start, n, z) => { BIG = start == null ? null : { start, n, z }; Z = 1; if (BIG) { W = window.innerWidth - 20; H = window.innerHeight - 40; resize(); } else build(); render(performance.now() / 1000); };
+function lookAt(x, y) {
+  const dx = G.mouse.x / Z - x, dy = G.mouse.y / Z - y, d = Math.max(80, Math.hypot(dx, dy));
+  return { x: dx / d, y: dy / d };
+}
+function branch(x, y, d) {   // same curve as game.js: from the stalk side to the plant's (0,44)
+  const sx = x - d * 74, ex = x, ey = y + 44;
+  for (const [w, col] of [[13, INK.C.ink], [7, "#5fb85a"]]) {
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(sx, y + 40); ctx.bezierCurveTo(sx + d * 26, y + 46, ex - d * 22, ey + 10, ex, ey); ctx.stroke();
+  }
+}
+let fr = 0, last = performance.now(), fpsT = 0;
+function render(t) {
+  INK.setTime(t); G.T = t;
+  const t0 = performance.now(), mode = document.getElementById("mode").value, mark = document.getElementById("mark").checked;
+  ctx.setTransform(dpr * Z, 0, 0, dpr * Z, 0, 0);
+  ctx.fillStyle = document.getElementById("dark").checked ? "#1d0f2b" : "#8fd0f5"; ctx.fillRect(0, 0, W, H);
+  if (mode === "type" && !BIG) for (let ti = 0; ti < 14; ti++) INK.label(ctx, TYPES[ti], 8, 30 + ti * 135, 16, "#fff3dc", "left");
+  let list = plants;
+  if (BIG) { const cols = Math.max(1, Math.floor(W / (150 * BIG.z))); list = plants.slice(BIG.start, BIG.start + BIG.n).map((q, k) => ({ p: q.p, d: q.d, x: 80 + (k % cols) * 150, y: 60 + Math.floor(k / cols) * 140 })); ctx.scale(BIG.z, BIG.z); }
+  for (const q of list) branch(q.x, q.y, q.d);
+  list.forEach((q, i) => {
+    const o = { t, dir: q.d, look: lookAt(q.x, q.y) };
+    if (mode === "hit") { o.wob = Math.max(0, 1 - ((t * 0.7 + i * 0.13) % 2)); o.sad = i % 7 === 3; o.talk = i % 5 === 1; }
+    ctx.save(); ctx.translate(q.x, q.y);
+    try { DRAW.plant(ctx, q.p, o); } catch (e) { console.error(q.p, e); }
+    ctx.restore();
+    if (mark) { ctx.strokeStyle = "#ff2050"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(q.x - 6, q.y + 44); ctx.lineTo(q.x + 6, q.y + 44); ctx.moveTo(q.x, q.y + 38); ctx.lineTo(q.x, q.y + 50); ctx.stroke(); }
+    if (mode !== "type" || BIG) INK.label(ctx, q.p.type + (BIG ? " m" + DRAW._var(q.p).m + " pot" + DRAW._var(q.p).pot + " " + DRAW._var(q.p).feat + "/" + DRAW._var(q.p).feat2 : ""), q.x, q.y + 66, BIG ? 7 : 12, "#fff3dc", "center", INK.HAND, 3);
+  });
+  fpsT = performance.now() - t0;
+}
+function frame(now) {
+  fr++; if (now - last > 1000) { document.getElementById("fps").textContent = fr + " fps, draw " + fpsT.toFixed(1) + " ms"; fr = 0; last = now; }
+  render(now / 1000); requestAnimationFrame(frame);
+}
+window.renderOnce = t => render(t == null ? performance.now() / 1000 : t);
+build(); requestAnimationFrame(frame);
+</script></body></html>

@@ -1,0 +1,142 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>DRAW preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Chewy&family=Gaegu:wght@700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#8fd0f5;font-family:Gaegu,sans-serif}
+  #bar{position:sticky;top:0;z-index:2;background:#1d0f2b;color:#fff3dc;padding:6px 10px;font:16px Chewy,cursive}
+  #bar label{margin-right:14px}
+  canvas{display:block}
+</style></head><body>
+<div id="bar">DRAW preview &mdash; move the mouse; eyes should follow.
+  <label><input type="checkbox" id="dark"> dark bg</label>
+  <label>zoom <input type="range" id="zoom" min="0.6" max="2.5" step="0.1" value="1"></label>
+  <span id="fps"></span></div>
+<canvas id="c"></canvas>
+<script src="../src/js/econ.js"></script>
+<script src="../src/js/data.js"></script>
+<script src="../src/js/ink.js"></script>
+<script src="../src/js/util.js"></script>
+<script src="../src/js/zones.js"></script>
+<script src="../src/js/draw.js"></script>
+<script>
+var G = { S: { zone: 0, u: 0, settings: {} }, mouse: { x: 0, y: 0, in: true }, T: 0, W: 0, H: 0 };
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+let W = 0, H = 0, dpr = 1, zoom = 1;
+const COLS = ["#ff7eb6", "#ffd23f", "#c58bff", "#7be07b", "#6ad1ff", "#ff9a3c", "#ff5a5a", "#f2e9ff", "#b5763a"];
+const TYPES = DATA.SPECIES.map(s => s.t), ES = ["round", "sleepy", "wide", "side", "spiral"];
+const MS = ["smile", "flat", "o", "teeth", "tongue", "wobbly"];
+const AC = ["none", "tophat", "bow", "glasses", "monocle", "mustache", "unibrow", "flower", "bandaid", "earring"];
+function desc(ty, k) {
+  const h = (k * 47 + ty.length * 31) % 360;
+  return { i: k, name: ty, type: ty, c1: INK.hsl(h, 75, 66), c2: INK.hsl((h + 150) % 360, 80, 62), hue: h,
+    eyes: 1 + (k % 3), eyeStyle: ES[k % 5], mouth: MS[(k * 5) % 6], acc: AC[k % 10], pt: 5 + (k % 5), seed: k * 13 + 3 };
+}
+function resize() {
+  dpr = window.devicePixelRatio || 1; W = 1400 * zoom; H = 3900 * zoom;
+  cv.style.width = W + "px"; cv.style.height = H + "px"; cv.width = W * dpr; cv.height = H * dpr;
+  G.W = W; G.H = H;
+}
+document.getElementById("zoom").oninput = e => { zoom = +e.target.value; resize(); };
+window.addEventListener("resize", resize);
+cv.addEventListener("mousemove", e => { const r = cv.getBoundingClientRect(); G.mouse.x = e.clientX - r.left; G.mouse.y = e.clientY - r.top; });
+function lookAt(x, y) {   // look vector from screen point (css px) toward mouse
+  const dx = G.mouse.x - x * zoom, dy = G.mouse.y - y * zoom, d = Math.hypot(dx, dy) || 1, s = Math.min(1, d / 70) / d;
+  return { x: dx * s, y: dy * s };
+}
+function title(txt, y) { INK.label(ctx, txt, 14, y, 22, "#fff3dc", "left"); }
+function small(txt, x, y) { INK.label(ctx, txt, x, y, 13, "#fff3dc", "center", INK.HAND, 3); }
+function at(x, y, f) { ctx.save(); ctx.translate(x, y); f(); ctx.restore(); }
+let fr = 0, last = performance.now(), fpsT = 0;
+function frame(now) {
+  const t = now / 1000; INK.setTime(t); G.T = t;
+  fr++; if (now - last > 1000) { document.getElementById("fps").textContent = fr + " fps, draw " + fpsT.toFixed(1) + " ms"; fr = 0; last = now; }
+  const t0 = performance.now();
+  ctx.setTransform(dpr * zoom, 0, 0, dpr * zoom, 0, 0);
+  ctx.fillStyle = document.getElementById("dark").checked ? "#1d0f2b" : "#8fd0f5"; ctx.fillRect(0, 0, 1410, 3910);
+  const cw = 96;
+  title("Plants: 14 types x varied descriptors (eyes/eyeStyle/mouth/acc cycle)", 34);
+  for (let r = 0; r < 3; r++) for (let i = 0; i < 14; i++) {
+    const x = 60 + i * cw, y = 100 + r * 112, p = desc(TYPES[i], r * 14 + i);
+    at(x, y, () => DRAW.plant(ctx, p, { t, look: lookAt(x, y), dir: i & 1 ? 1 : -1 }));
+    small(p.eyes + " " + p.eyeStyle + " " + p.mouth + " " + p.acc, x, y + 56);
+  }
+  title("Hit (wob cycles) / sad / talk / growing", 400);
+  for (let i = 0; i < 14; i++) {
+    const x = 60 + i * cw, y = 460, p = desc(TYPES[i], 50 + i), wob = Math.max(0, 1 - ((t * 0.7 + i * 0.07) % 1.6));
+    at(x, y, () => DRAW.plant(ctx, p, { t, wob, look: lookAt(x, y), dir: 1 }));
+    small(TYPES[i], x, y + 56);
+  }
+  for (let i = 0; i < 14; i++) {
+    const x = 60 + i * cw, y = 575, p = desc(TYPES[i], 80 + i), mode = i < 5 ? "sad" : i < 10 ? "talk" : "grow";
+    const grow = mode === "grow" ? Math.min(1, (t * 0.5 + i * 0.2) % 1.5) : 1;
+    at(x, y, () => DRAW.plant(ctx, p, { t, sad: mode === "sad", talk: mode === "talk", grow, look: lookAt(x, y) }));
+    small(mode, x, y + 56);
+  }
+  title("Gerald: moods + spit", 660);
+  const moods = ["grump", "happy", "shock", "sad", "talk", "grump"];
+  for (let i = 0; i < 6; i++) {
+    const x = 90 + i * 150, y = 740;
+    at(x, y, () => DRAW.gerald(ctx, { t, mood: moods[i], spit: i === 5 ? Math.max(0, Math.sin(t * 3)) : 0, look: lookAt(x, y - 6), hat: "none" }));
+    small(i === 5 ? "spit" : moods[i], x, y + 62);
+  }
+  at(1060, 740, () => DRAW.gerald(ctx, { t, mood: "grump", scale: 1.4, hat: "tophat", look: lookAt(1060, 732) }));
+  small("scale 1.4", 1060, 822);
+  title("Hats (Gerald scale 0.75)", 850);
+  DATA.HATS.forEach((h, i) => {
+    const x = 60 + (i % 11) * 112, y = 935 + Math.floor(i / 11) * 125;
+    at(x, y, () => DRAW.gerald(ctx, { t, mood: "grump", scale: 0.75, hat: h.id, look: lookAt(x, y) }));
+    small(h.id, x, y + 50);
+  });
+  title("Props: beans, gold beans, socks 0-3, bubbles 14/22/30, coins", 1150);
+  for (let i = 0; i < 5; i++) at(40 + i * 34, 1200, () => DRAW.bean(ctx, false, t + i, i));
+  for (let i = 0; i < 5; i++) at(230 + i * 34, 1200, () => DRAW.bean(ctx, true, t + i, i));
+  for (let k = 0; k < 4; k++) at(430 + k * 60, 1205, () => DRAW.sock(ctx, k, t, k));
+  [14, 22, 30].forEach((r, i) => at(700 + i * 75, 1205, () => DRAW.bubble(ctx, r, t + i)));
+  [6, 10, 16].forEach((r, i) => at(940 + i * 45, 1205, () => DRAW.coin(ctx, r)));
+  title("Visitors (all 28)", 1270);
+  Object.keys(DATA.VISITORS).forEach((id, i) => {
+    const x = 70 + (i % 10) * 118, y = 1340 + Math.floor(i / 10) * 120;
+    at(x, y, () => DRAW.visitor(ctx, DATA.VISITORS[id], t + i));
+    small(id, x, y + 52);
+  });
+  title("Wormsley (rise cycles / smug / happy / chew) + the Moon (smug / nervous / bye / sleep)", 1700);
+  const rise = Math.min(1, (t * 0.35) % 1.4);
+  ["smug", "smug", "happy", "chew"].forEach((m, i) => {
+    const x = 110 + i * 150, y = 1990;
+    at(x, y, () => DRAW.worm(ctx, { t, size: 32, rise: i ? 1 : rise, mood: m, mouth: m === "happy" ? Math.max(0, Math.sin(t * 2)) * 0.6 : 0 }));
+    small(i ? m : "rising", x, y + 30);
+  });
+  ["smug", "nervous", "bye", "sleep"].forEach((m, i) => {
+    const x = 740 + (i % 2) * 150, y = 1790 + Math.floor(i / 2) * 140;
+    at(x, y, () => DRAW.moonFace(ctx, 55, { t, mood: m, look: lookAt(x, y) }));
+    small(m, x, y + 66);
+  });
+  at(1120, 1860, () => DRAW.moonFace(ctx, 110, { t, mood: "smug", look: lookAt(1120, 1860) }));
+  title("Portraits (size 80, every speaker key)", 2070);
+  Object.keys(DATA.SPEAKERS).forEach((k, i) => {
+    const x = 70 + (i % 10) * 118, y = 2150 + Math.floor(i / 10) * 125;
+    ctx.fillStyle = "#1d0f2b"; ctx.fillRect(x - 46, y - 46, 92, 92);
+    ctx.save(); ctx.beginPath(); ctx.rect(x - 44, y - 44, 88, 88); ctx.clip();
+    at(x, y, () => DRAW.portrait(ctx, k, 80, t)); ctx.restore();
+    small(k, x, y + 60);
+  });
+  title("In context: stalk with plants every 92px, Gerald on top", 2520);
+  const sx = 600, base = 3860;
+  ctx.strokeStyle = INK.C.ink; ctx.lineWidth = 18; ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(sx, base); ctx.lineTo(sx, 2680); ctx.stroke();
+  ctx.strokeStyle = INK.C.leaf; ctx.lineWidth = 12; ctx.stroke();
+  for (let i = 0; i < 13; i++) {
+    const y = base - 40 - i * 92, side = i & 1 ? 1 : -1, x = sx + side * 62, p = desc(TYPES[i % 14], 200 + i);
+    const wob = Math.max(0, 1 - ((t * 1.3 + i * 0.37) % 2.5));
+    at(x, y, () => DRAW.plant(ctx, p, { t, dir: side, wob, look: lookAt(x, y) }));
+    if (wob > 0.95) {}
+  }
+  for (let i = 0; i < 4; i++) { const y = 2700 + ((t * 160 + i * 300) % 1150); at(sx + (i & 1 ? 14 : -14), y, () => DRAW.bean(ctx, i === 2, t, i)); }
+  at(sx, 2640, () => DRAW.gerald(ctx, { t, mood: "grump", spit: Math.max(0, Math.sin(t * 4)) ** 4, look: lookAt(sx, 2634) }));
+  at(900, 3000 + Math.sin(t) * 40, () => DRAW.visitor(ctx, DATA.VISITORS.pigeon_tie, t));
+  at(330, 3200, () => DRAW.bubble(ctx, 24, t));
+  at(950, 2800 + ((t * 60) % 900), () => DRAW.sock(ctx, 1, t, 3));
+  fpsT = performance.now() - t0;
+  requestAnimationFrame(frame);
+}
+resize(); requestAnimationFrame(frame);
+</script></body></html>

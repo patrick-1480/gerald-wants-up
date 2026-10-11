@@ -1,0 +1,88 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CINE preview</title>
+<style>
+body{margin:0;background:#2b1c40;color:#fff3dc;font:15px "Comic Sans MS",cursive;min-height:100vh}
+#bg{position:fixed;inset:0;width:100%;height:100%;z-index:0}
+#ui{position:relative;z-index:1;padding:12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+button{font:inherit;background:#fff3dc;color:#1d0f2b;border:3px solid #1d0f2b;border-radius:10px;padding:4px 10px;cursor:pointer}
+button:hover{background:#ffd23f}
+#log{position:relative;z-index:1;margin:0 12px;padding:8px;background:rgba(0,0,0,.4);border-radius:8px;white-space:pre-wrap;font:12px monospace;max-height:40vh;overflow:auto}
+h3{margin:6px 0;width:100%}
+</style>
+<script>/* ?static=1 disables CSS transitions so screenshots are reliable when the browser pane is hidden/throttled */
+if (/static=1/.test(location.search)) document.write('<style>#cine,#cine *{transition:none!important;animation:none!important}</style>');</script></head><body>
+<canvas id="bg"></canvas>
+<div id="ui"><h3>Gerald Wants Up - cutscene preview</h3></div>
+<pre id="log"></pre>
+<script src="../src/js/econ.js"></script>
+<script src="../src/js/data.js"></script>
+<script src="../src/js/ink.js"></script>
+<script src="../src/js/util.js"></script>
+<script src="../src/js/zones.js"></script>
+<script>
+var G = { S: { zone: 0, u: 0, settings: {}, flags: {} }, mouse: { x: 0, y: 0 }, T: 0 };
+var LOG = [];
+function log(m) { LOG.unshift(new Date().toLocaleTimeString() + "  " + m); document.getElementById("log").textContent = LOG.slice(0, 40).join("\n"); }
+/* tolerant loader: optional modules may not exist yet */
+async function loadOpt(name) {
+  const url = "../src/js/" + name + ".js";
+  try { const r = await fetch(url, { method: "HEAD", cache: "no-store" }); if (!r.ok) { log(name + ".js missing (fallbacks used)"); return; } } catch (e) { log(name + ".js unreachable"); return; }
+  await new Promise(res => { const s = document.createElement("script"); s.src = url + "?v=" + Date.now(); s.onload = res; s.onerror = () => { log(name + ".js failed to load"); res(); }; document.body.appendChild(s); });
+  log(name + ".js loaded");
+}
+const TYPES = ["daisy", "shroom", "cactus", "fern", "root", "puff", "eye", "mouth", "blob", "hand", "sock", "coat", "neck", "tooth"];
+const ES = ["round", "sleepy", "wide", "side", "spiral"], MO = ["smile", "flat", "o", "teeth", "tongue", "wobbly"];
+const AC = ["none", "tophat", "bow", "glasses", "monocle", "mustache", "unibrow", "flower", "bandaid", "earring"];
+function fakePlants(n, off) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const hue = (i * 47 + off * 13) % 360;
+    out.push({ i, name: "Plant #" + (i + 1), type: TYPES[(i + off) % TYPES.length], c1: INK.hsl(hue, 70, 62), c2: INK.hsl((hue + 140) % 360, 75, 70), hue,
+      eyes: 1 + (i % 3), eyeStyle: ES[i % ES.length], mouth: MO[i % MO.length], acc: AC[(i * 3) % AC.length], pt: 5 + (i % 5), seed: 100 + i * 17 + off });
+  }
+  return out;
+}
+/* test helper: advance the active scene by sec seconds at 60fps (works even when the tab is hidden/throttled) */
+function pump(sec) { const sc = CINE._s; if (!sc) return "none"; const n = Math.round(sec * 60); for (let i = 0; i < n; i++) { if (CINE._s !== sc || sc.dead) break; CINE._step(sc, 1 / 60, true); } return CINE._s ? CINE._s.id + " step " + CINE._s.i + "/" + CINE._s.steps.length : "ended"; }
+function adv(k, sec) { for (let i = 0; i < (k || 1); i++) { if (!CINE._s) break; CINE._adv(CINE._s); pump(sec == null ? 0.05 : sec); } return CINE._s ? CINE._s.id + " step " + CINE._s.i : "ended"; }
+let plays = 0;
+function play(id, params) {
+  const n = ++plays;
+  if (typeof SFX !== "undefined" && SFX.init) try { SFX.init(); } catch (e) { }
+  log("play #" + n + " " + id + (params && params.zone ? " k=" + params.zone.k : "") + (CINE.active ? " (queued)" : ""));
+  let calls = 0;
+  CINE.play(id, params, () => { calls++; log("onDone #" + n + " " + id + " calls=" + calls); });
+}
+function btn(label, fn) { const b = document.createElement("button"); b.textContent = label; b.onclick = fn; document.getElementById("ui").appendChild(b); return b; }
+async function boot() {
+  await loadOpt("audio"); await loadOpt("draw"); await loadOpt("world");
+  await new Promise(res => { const s = document.createElement("script"); s.src = "../src/js/cutscene.js?v=" + Date.now(); s.onload = res; s.onerror = () => { log("cutscene.js failed"); res(); }; document.body.appendChild(s); });
+  btn("intro", () => play("intro", {}));
+  btn("compost", () => play("compost", { mulch: 1234, ft: 1800, plants: fakePlants(8, 0), top: "Smug Daisy the Elder" }));
+  btn("compostShort", () => play("compostShort", { mulch: 98765, ft: 4200, plants: fakePlants(8, 5), top: "Tax Fern Jr." }));
+  btn("compost (3 plants)", () => play("compost", { mulch: 12, ft: 300, plants: fakePlants(3, 2), top: "Moist Turnip" }));
+  btn("reward relic", () => play("reward", { title: "Relic found: Gnome's Spare Eye", lines: ["Socks worth +25%", "It is still watching. Fondly."], icon: "👁️" }));
+  btn("reward hat", () => play("reward", { title: "New hat: Tiny Top Hat", lines: ["Very dignified."], icon: "🎩" }));
+  for (let k = 0; k <= 16; k++) btn("zone " + k, () => { G.S.zone = k; play("zone", { zone: ZONES.get(k) }); });
+  btn("queue: short+zone1+reward", () => { play("compostShort", { mulch: 5, ft: 200, plants: fakePlants(4, 1) }); play("zone", { zone: ZONES.get(1) }); play("reward", { title: "Queued!", lines: ["third in line"], icon: "🎉" }); });
+  btn("toggle shake", e => { G.S.settings.shake = G.S.settings.shake === false ? true : false; log("shake setting = " + G.S.settings.shake); });
+  btn("hat: party", () => { G.S.hat = G.S.hat === "party" ? "none" : "party"; log("hat=" + G.S.hat); });
+  log("ready. CINE " + (typeof CINE !== "undefined" ? "loaded" : "MISSING"));
+  const q = new URLSearchParams(location.search).get("play");
+  if (q) { const b = [...document.querySelectorAll("#ui button")].find(x => x.textContent === q); if (b) b.click(); }
+}
+/* fake game behind (so the transparent reward card can be seen) */
+const bg = document.getElementById("bg"), bx = bg.getContext("2d");
+function drawBg(ts) {
+  const W = bg.width = innerWidth, H = bg.height = innerHeight, t = ts / 1000; G.T = t; INK.setTime(t);
+  const g = bx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#7cc8ff"); g.addColorStop(1, "#e6f7ff"); bx.fillStyle = g; bx.fillRect(0, 0, W, H);
+  bx.strokeStyle = INK.C.ink; bx.lineWidth = 3;
+  for (let i = 0; i < 6; i++) INK.blob(bx, W / 2 + (i % 2 ? 60 : -60), H - 120 - i * 80, 26, 24, INK.hsl(i * 50, 70, 65), true, i);
+  bx.fillStyle = "#5cbf5c"; bx.fillRect(W / 2 - 7, 0, 14, H);
+  requestAnimationFrame(drawBg);
+}
+requestAnimationFrame(drawBg);
+boot();
+</script>
+</body></html>

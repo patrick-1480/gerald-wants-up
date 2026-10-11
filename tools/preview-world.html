@@ -1,0 +1,113 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>WORLD preview</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Chewy&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#1d0f2b;font:13px system-ui,sans-serif;color:#fff3dc}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block}
+  #ui{position:fixed;left:8px;top:8px;right:8px;background:rgba(29,15,43,.82);padding:6px 8px;border-radius:8px;z-index:2}
+  #ui button{background:#3a2550;color:#fff3dc;border:1px solid #6a4a8a;border-radius:5px;padding:2px 6px;margin:1px;cursor:pointer;font-size:12px}
+  #ui button.on{background:#ff7eb6;color:#1d0f2b}
+  #alt{width:min(700px,60vw);vertical-align:middle}
+  #info{font-family:monospace;white-space:pre}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="ui">
+  alt <input id="alt" type="range" min="0" max="1700" step="0.1" value="5">
+  <span id="info"></span><br>
+  <span id="zb"></span><br>
+  decor override: <select id="dec"><option value="">(zone's own)</option></select>
+  <button id="mg">moonGone: off</button> <button id="auto">auto-climb: off</button>
+  <button id="ov">overlay: on</button> <button id="pl">plants: on</button> <button id="lo">lowfx: off</button>
+  <button id="hide">hide UI (h)</button>
+</div>
+<script src="../src/js/econ.js"></script>
+<script src="../src/js/data.js"></script>
+<script src="../src/js/ink.js"></script>
+<script src="../src/js/util.js"></script>
+<script src="../src/js/zones.js"></script>
+<script src="../src/js/draw.js" onerror="console.log('draw.js not present - using WORLD fallbacks')"></script>
+<script src="../src/js/world.js"></script>
+<script>
+var G = { S: { mtn: 30, zone: 20, u: 0, settings: {}, flags: { moonGone: false },
+  strata: [{ h: 6, name: 'Smug Tulip Jr.', n: 12, hue: 30 }, { h: 9, name: 'Haunted Fern', n: 18, hue: 200 }, { h: 15, name: 'Tax Onion III', n: 30, hue: 120 }] },
+  mouse: { x: 0, y: 0, in: false }, T: 0, cam: 0, W: 0, H: 0 };
+const cv = document.getElementById('c'), ctx = cv.getContext('2d'), $ = id => document.getElementById(id);
+let W = 0, H = 0, alt = 5, auto = false, showOv = true, showPl = true, override = '', lastOverK = -1, lastOverDecor = null;
+const qp = new URLSearchParams(location.search), FW = +qp.get('w') || 0, FH = +qp.get('h') || 0;
+function resize() {   // ?w=1200&h=740 renders a fixed-size frame, letterboxed into the window
+  const d = FW ? 1 : Math.min(2, devicePixelRatio || 1); W = FW || innerWidth; H = FH || innerHeight;
+  cv.width = W * d; cv.height = H * d; ctx.setTransform(d, 0, 0, d, 0, 0); G.W = W; G.H = H;
+  if (FW) cv.style.objectFit = 'contain';
+}
+addEventListener('resize', resize); resize();
+const sl = $('alt');
+sl.oninput = () => { alt = +sl.value; };
+addEventListener('wheel', e => { alt = Math.max(0, Math.min(1700, alt - e.deltaY * 0.01)); sl.value = alt; }, { passive: true });
+addEventListener('mousemove', e => { G.mouse.x = e.clientX; G.mouse.y = e.clientY; G.mouse.in = true; });
+addEventListener('keydown', e => { if (e.key === 'h') $('ui').style.display = $('ui').style.display === 'none' ? '' : 'none'; });
+// zone jump buttons
+let k = 0; const zb = $('zb');
+while (ECON.zoneAt(k) < 1700) {
+  const z = ZONES.get(k), b = document.createElement('button'), kk = k;
+  b.textContent = k + ':' + z.decor; b.title = z.name + ' @ ' + z.at;
+  b.onclick = () => { alt = ZONES.get(kk).at + 3; sl.value = alt; };
+  zb.appendChild(b);
+  if (k > 0) { const b2 = document.createElement('button'); b2.textContent = '~'; b2.title = 'transition into ' + k;
+    b2.onclick = () => { alt = ZONES.get(kk).at - 3; sl.value = alt; }; zb.appendChild(b2); }
+  k++;
+}
+for (const n of WORLD.sets) { const o = document.createElement('option'); o.value = o.textContent = n; $('dec').appendChild(o); }
+$('dec').onchange = e => { override = e.target.value; };
+const tog = (id, lab, get, set) => { $(id).onclick = () => { set(!get()); $(id).textContent = lab + ': ' + (get() ? 'on' : 'off'); $(id).classList.toggle('on', get()); }; };
+tog('mg', 'moonGone', () => G.S.flags.moonGone, v => G.S.flags.moonGone = v);
+tog('auto', 'auto-climb', () => auto, v => auto = v);
+tog('ov', 'overlay', () => showOv, v => showOv = v);
+tog('pl', 'plants', () => showPl, v => showPl = v);
+tog('lo', 'lowfx', () => !!G.S.settings.lowfx, v => G.S.settings.lowfx = v);
+$('hide').onclick = () => { $('ui').style.display = 'none'; };
+let t0 = performance.now(), last = t0, fps = 60, msAvg = 0, msMax = 0, frames = 0;
+function loop(now) {
+  const dt = Math.min(0.1, (now - last) / 1000); last = now; fps = fps * 0.95 + (1 / Math.max(dt, 1e-3)) * 0.05;
+  const t = (now - t0) / 1000; G.T = t; INK.setTime(t);
+  if (auto) { alt += dt * 4; if (alt > 1700) alt = 0; sl.value = alt; }
+  // decor override applies to the zone under the camera
+  const zk = ECON.zoneOf(alt);
+  if (lastOverK >= 0 && (lastOverK !== zk || ZONES.get(lastOverK).decor !== override)) { ZONES.get(lastOverK).decor = lastOverDecor; lastOverK = -1; }
+  if (override && lastOverK < 0) { lastOverK = zk; lastOverDecor = ZONES.get(zk).decor; ZONES.get(zk).decor = override; }
+  G.cam = alt * ECON.GAP - H / 2 + 70;
+  const toY = wy => H - 70 - (wy - G.cam), v = { W, H, cx: W / 2, toY, gap: ECON.GAP, cam: G.cam };
+  const a = performance.now();
+  WORLD.sky(ctx, W, H, alt, t);
+  WORLD.landmarks(ctx, v, t);
+  WORLD.ground(ctx, v, t);
+  const b = performance.now();
+  // fake stalk + fake plants (to judge readability against the decor)
+  const top = G.S.mtn * ECON.GAP;
+  ctx.save(); ctx.lineCap = 'round';
+  ctx.strokeStyle = '#1d0f2b'; ctx.lineWidth = 14; ctx.beginPath(); ctx.moveTo(W / 2, Math.min(H + 20, toY(top))); ctx.lineTo(W / 2, -20); ctx.stroke();
+  ctx.strokeStyle = '#6bd36b'; ctx.lineWidth = 9; ctx.stroke();
+  if (showPl) for (let i = Math.max(0, Math.floor((G.cam - top - 300) / ECON.GAP)); i < 40000; i++) {
+    const y = toY(top + 140 + i * ECON.GAP); if (y < -60) break; if (y > H + 60) continue;
+    const x = W / 2 + (i % 2 ? 74 : -74);
+    ctx.fillStyle = INK.hsl((i * 47) % 360, 72, 66); ctx.strokeStyle = '#1d0f2b'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, 34, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.strokeStyle = '#1d0f2b'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(W / 2 + (i % 2 ? 134 : -134), y - 8, 18, 0, 7); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
+  const c2 = performance.now();
+  if (showOv) WORLD.overlay(ctx, W, H, t);
+  const d2 = performance.now(), ms = (b - a) + (d2 - c2);
+  msAvg = msAvg * 0.95 + ms * 0.05; msMax = Math.max(msMax * 0.995, ms);
+  if (++frames % 10 === 0) {
+    const z = ZONES.get(zk), nx = ECON.zoneAt(zk + 1);
+    $('info').textContent = ' alt ' + alt.toFixed(1) + '  zone ' + zk + ' "' + z.name + '" decor=' + z.decor +
+      '  next@' + nx + '  fps ' + fps.toFixed(0) + '  world ms avg ' + msAvg.toFixed(2) + ' max ' + msMax.toFixed(2);
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+window.PREVIEW = { set(a) { alt = a; sl.value = a; }, stats: () => ({ fps, msAvg, msMax }) };
+</script>
+</body></html>

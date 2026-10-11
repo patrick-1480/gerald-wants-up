@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gerald Audio Preview</title>
+<style>
+  :root { --bg: #1d0f2b; --panel: #2c1940; --ink: #12071c; --cream: #fff3dc; --acc: #ffd23f; --green: #7be07b; --dim: #c9b3e8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--cream); font: 15px/1.4 system-ui, sans-serif; }
+  h1 { margin: 0 0 4px; font-size: 24px; color: var(--green); }
+  h2 { margin: 18px 0 8px; font-size: 16px; color: var(--acc); text-transform: uppercase; letter-spacing: 1px; }
+  p.note { margin: 0 0 12px; color: var(--dim); }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  button, select { font: inherit; color: var(--cream); background: var(--panel); border: 3px solid var(--ink);
+    border-radius: 10px; padding: 6px 10px; cursor: pointer; box-shadow: 0 3px 0 var(--ink); }
+  button:hover { background: #3d2557; }
+  button:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+  button.big { background: #2f6b2f; font-size: 18px; padding: 10px 18px; }
+  button.on { background: #6b4a12; }
+  button.zone.cur { background: #2f6b2f; }
+  label { display: inline-flex; gap: 8px; align-items: center; margin-right: 16px; }
+  input[type=range] { width: 160px; }
+  pre { background: var(--ink); padding: 10px; border-radius: 8px; overflow-x: auto; font-size: 12px; margin: 0; }
+  table { border-collapse: collapse; font-size: 12px; }
+  td, th { border: 1px solid #44305a; padding: 3px 8px; text-align: right; }
+  th { color: var(--acc); }
+  td:first-child, th:first-child { text-align: left; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<h1>Gerald Wants Up: audio preview</h1>
+<p class="note">Everything is synthesized live (Web Audio). Start audio first (browsers need a click).</p>
+<div class="row">
+  <button class="big" id="start">Start audio</button>
+  <button id="musOn" class="on">Music: ON</button>
+  <button id="duck">Duck: off</button>
+  <label>SFX <input type="range" id="vs" min="0" max="1" step="0.01" value="0.7"><span id="vsv">0.70</span></label>
+  <label>Music <input type="range" id="vm" min="0" max="1" step="0.01" value="0.5"><span id="vmv">0.50</span></label>
+</div>
+
+<h2>Music by zone</h2>
+<div class="row" id="zones"></div>
+<div class="row" style="margin-top:6px">
+  <select id="zsel"></select>
+  <span id="znow" class="note"></span>
+</div>
+
+<h2>Sound effects</h2>
+<div class="row" id="sfx"></div>
+<div class="row" style="margin-top:6px">
+  <button id="storm">Hit storm (40/s for 3 s)</button>
+  <label>blip voice <select id="spk"></select></label>
+</div>
+
+<h2>Cutscene cues</h2>
+<div class="row" id="cues"></div>
+
+<div class="grid">
+  <div><h2>Live stats</h2><pre id="stats">(not started)</pre></div>
+  <div><h2>Offline level check</h2>
+    <div class="row"><button id="anaMus">Analyze music (all zones)</button><button id="anaSfx">Analyze sfx</button></div>
+    <div id="ana" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<script src="../src/js/econ.js"></script>
+<script src="../src/js/data.js"></script>
+<script src="../src/js/ink.js"></script>
+<script src="../src/js/util.js"></script>
+<script src="../src/js/zones.js"></script>
+<script src="../src/js/audio.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const mk = (tag, txt, parent, cls) => { const e = document.createElement(tag); e.textContent = txt; if (cls) e.className = cls; parent.appendChild(e); return e; };
+  let hitI = 0, curZone = -1;
+  window.__errors = [];
+  window.addEventListener("error", e => window.__errors.push(String(e.message)));
+
+  $("start").onclick = () => { SFX.init(); SFX.setVolume(+$("vs").value, +$("vm").value); if (curZone < 0) pickZone(0); };
+
+  /* zones 0-14 as buttons, plus a dropdown with procedural layers */
+  const zoneBtns = {};
+  const pickZone = k => {
+    curZone = k; SFX.music(ZONES.get(k));
+    for (const b of Object.values(zoneBtns)) b.classList.remove("cur");
+    if (zoneBtns[k]) zoneBtns[k].classList.add("cur");
+    const z = ZONES.get(k);
+    $("znow").textContent = "Now: " + k + " " + z.short + "  [" + z.mus.join(", ") + "]";
+    $("zsel").value = k;
+  };
+  for (let k = 0; k < 15; k++) { const b = mk("button", k + " " + ZONES.get(k).short, $("zones"), "zone"); b.onclick = () => pickZone(k); zoneBtns[k] = b; }
+  for (let k = 0; k <= 40; k++) { const o = mk("option", k + ": " + ZONES.get(k).short + (k > 14 ? " (proc)" : ""), $("zsel")); o.value = k; }
+  for (const k of [15, 16, 17, 18, 19, 20]) { const b = mk("button", k + " proc", $("zones"), "zone"); b.onclick = () => pickZone(k); zoneBtns[k] = b; }
+  $("zsel").onchange = () => pickZone(+$("zsel").value);
+
+  for (const key of Object.keys(DATA.SPEAKERS)) { const o = mk("option", key + " (" + DATA.SPEAKERS[key].pitch + " Hz)", $("spk")); o.value = DATA.SPEAKERS[key].pitch; }
+  $("spk").value = DATA.SPEAKERS.gerald.pitch;
+
+  for (const n of SFX.names) {
+    const b = mk("button", n, $("sfx"));
+    b.onclick = () => {
+      if (n === "hit") SFX.play("hit", { i: hitI++ });
+      else if (n === "upgrade") SFX.play("upgrade", { n: [1, 5, 25, 100][Math.floor(Math.random() * 4)] });
+      else if (n === "blip") { let i = 0; const iv = setInterval(() => { SFX.play("blip", { pitch: +$("spk").value }); if (++i > 14) clearInterval(iv); }, 55); }
+      else SFX.play(n);
+    };
+  }
+  $("storm").onclick = () => {
+    let c = 0; const iv = setInterval(() => { SFX.play("hit", { i: hitI++ }); if (++c >= 120) clearInterval(iv); }, 25);
+  };
+  for (const q of SFX.cues) mk("button", q, $("cues")).onclick = () => SFX.cue(q);
+
+  let musOn = true, ducked = false;
+  $("musOn").onclick = () => { musOn = !musOn; SFX.setMusicOn(musOn); $("musOn").textContent = "Music: " + (musOn ? "ON" : "OFF"); $("musOn").classList.toggle("on", musOn); };
+  $("duck").onclick = () => { ducked = !ducked; SFX.duck(ducked); $("duck").textContent = "Duck: " + (ducked ? "ON" : "off"); $("duck").classList.toggle("on", ducked); };
+  const vol = () => { $("vsv").textContent = (+$("vs").value).toFixed(2); $("vmv").textContent = (+$("vm").value).toFixed(2); SFX.setVolume(+$("vs").value, +$("vm").value); };
+  $("vs").oninput = vol; $("vm").oninput = vol;
+
+  setInterval(() => { if (SFX.ready) $("stats").textContent = JSON.stringify(SFX._stats, null, 1); }, 250);
+
+  /* offline renders: level (peak / rms) and brightness (energy share above ~2.5 kHz) */
+  const table = (rows, cols) => {
+    let h = "<table><tr>" + cols.map(c => "<th>" + c + "</th>").join("") + "</tr>";
+    for (const r of rows) h += "<tr>" + cols.map(c => "<td>" + r[c] + "</td>").join("") + "</tr>";
+    return h + "</table>";
+  };
+  $("anaMus").onclick = async () => {
+    const rows = [];
+    for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]) {
+      const r = await SFX._render(k, 24); rows.push(Object.assign({ zone: k + " " + ZONES.get(k).short }, r));
+      $("ana").innerHTML = table(rows, ["zone", "peak", "rms", "lmax", "hi"]);
+    }
+    window.__musRows = rows;
+  };
+  $("anaSfx").onclick = async () => {
+    const rows = [];
+    for (const n of SFX.names) { const r = await SFX._render(n, 3); rows.push(Object.assign({ sound: n }, r)); }
+    for (const q of SFX.cues) { const r = await SFX._render("cue:" + q, 7); rows.push(Object.assign({ sound: "cue:" + q }, r)); }
+    $("ana").innerHTML = table(rows, ["sound", "peak", "lmax", "hi"]);
+    window.__sfxRows = rows;
+  };
+})();
+</script>
+</body>
+</html>
