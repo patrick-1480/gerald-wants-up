@@ -190,40 +190,49 @@ textarea { width: 100%; height: 90px; background: var(--pn2); color: var(--cream
 }
 /* ---------- phones (portrait): full-screen game + bottom tab bar + slide-up sheet ---------- */
 @media (max-width: 760px) {
-  :root { --navH: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  :root { --navH: calc(56px + env(safe-area-inset-bottom, 0px)); }
   body { padding: 0; font-size: 17px; }
   #app { display: block; padding: 0; height: 100dvh; }
   #stage { position: fixed; left: 0; right: 0; top: 0; bottom: var(--navH); border: none; border-radius: 0; box-shadow: none; padding-top: env(safe-area-inset-top, 0px); }
   #panel { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: min(64dvh, 560px); border-radius: 22px 22px 0 0; border-width: 3px 0 0; box-shadow: 0 -4px 0 var(--ink);
     display: flex; flex-direction: column; transform: translateY(calc(100% - var(--navH))); transition: transform .28s cubic-bezier(.3,1.2,.5,1); }
   #panel.open { transform: none; }
-  #tabs { flex: none; height: 58px; padding: 6px 6px 0; border-bottom: 3px solid var(--ink); align-items: center; }
+  #tabs { flex: none; height: 56px; padding: 5px 5px 0; border-bottom: 3px solid var(--ink); align-items: center; gap: 3px; }
   #panel:not(.open) #tabs { padding-bottom: env(safe-area-inset-bottom, 0px); }
-  #tabs button { border-radius: 14px; border-bottom: 3px solid var(--ink); padding: 4px 2px; height: 46px; justify-content: center; }
+  #tabs button { border-radius: 12px; border-bottom: 3px solid var(--ink); padding: 3px 2px; height: 44px; justify-content: center; font-size: 17px; }
   #tabs button.on { transform: none; }
   #panel:not(.open) #tabs button.on { background: var(--pn); color: var(--dim); }
   #tabs button span { font-size: 11px; }
-  #sheetGrab { display: block !important; order: -1; height: 26px; }
+  #sheetGrab { display: none !important; }
   .tab { padding: 10px 10px 14px; }
-  #hudLeft { top: 8px; left: 8px; min-width: 0; padding: 5px 10px; }
-  .money { font-size: 25px; }
-  .sub { font-size: 14px; }
-  .chip { font-size: 14px; }
-  #objective { top: 100px; left: 8px; right: 58px; width: auto; transform: none; padding: 5px 10px; }
-  .objTop { font-size: 15px; }
-  #objSub { font-size: 13px; }
-  #hudRight { top: 8px; right: 8px; }
-  .round { width: 40px; height: 40px; }
-  #altMeter { display: none; }
-  #ticker { left: 8px; right: 8px; bottom: 8px; height: 28px; border-width: 2px; }
-  #ticker b { font-size: 12px; padding: 0 7px; }
-  #tickerText { font-size: 15px; }
-  #tutor { bottom: 44px; padding: 8px 10px; gap: 8px; }
-  #tutFace { width: 58px; height: 58px; }
-  .tutBody p { font-size: 17px; }
+  .card { border-width: 2px; box-shadow: 0 3px 0 var(--ink); }
+  #hudLeft { top: 6px; left: 6px; min-width: 0; padding: 4px 9px; }
+  .money { font-size: 21px; }
+  #hudLeft .sub { font-size: 12px; }
+  .chips { gap: 4px; margin-top: 2px; }
+  .chip { font-size: 12px; padding: 0 6px; }
+  #hud #objective { top: 6px; left: auto; right: 48px; width: calc(100% - 178px); max-width: 300px; transform: none; padding: 4px 8px; }
+  #hud .objTop { font-size: 12.5px; line-height: 1.05; gap: 5px; }
+  .objIcon { font-size: 14px; }
+  #objSub { font-size: 10.5px; }
+  #objective .bar { height: 7px; margin: 3px 0 1px; }
+  #hudRight { top: 6px; right: 6px; gap: 4px; }
+  .round { width: 36px; height: 36px; font-size: 15px; border-width: 2px; box-shadow: 0 2px 0 var(--ink); }
+  #altMeter, #ticker { display: none; }
+  #tutor { bottom: 8px; width: calc(100% - 16px); padding: 6px 9px; gap: 7px; border-width: 3px; box-shadow: 0 4px 0 var(--ink); }
+  #tutFace { width: 40px; height: 40px; }
+  .tutBody b { font-size: 14px; }
+  .tutBody p { font-size: 14.5px; line-height: 1.12; margin: 1px 0 4px; }
+  #tutBtns .btn { font-size: 13px; padding: 3px 10px; box-shadow: 0 3px 0 var(--ink); }
+  #tutArrow::before { font-size: 30px; left: -16px; top: -44px; }
+  .pop { font-size: 13px; padding: 7px; }
+  .pop .hd b { font-size: 15px; }
+  .pop .mr .btn { font-size: 12.5px; padding: 5px 4px; }
+  .toast { font-size: 14px; padding: 5px 10px; }
+  .btn.big { font-size: 18px; padding: 9px; }
   /* plant menu docks to the bottom of the game view */
-  .pop.docked { left: 8px !important; right: 8px; top: auto !important; bottom: 44px; width: auto; }
-  #toasts { bottom: calc(var(--navH) + 46px); }
+  .pop.docked { left: 6px !important; right: 6px; top: auto !important; bottom: 6px; width: auto; }
+  #toasts { bottom: calc(var(--navH) + 12px); }
   .row .btn { min-width: 84px; }
 }
 #sheetGrab { flex: none; text-align: center; padding: 4px 0 0; }
@@ -6712,7 +6721,7 @@ const STATE = {
     return {
       v: 3, sd: (Math.random() * 1e9) | 0, u: 0,
       // this run (reset by composting)
-      m: 0, run: 0, n: 1, lv: {}, bk: {}, ac: {}, shop: {}, runT: 0,
+      m: 0, run: 0, n: 1, lv: {}, bk: { 0: 50 }, ac: {}, shop: {}, runT: 0,   // first plant starts with a $50 bubble for the tutorial
       // permanent
       soc: 0, mu: 0, tm: 0, perk: {}, mtn: 0, strata: [], cc: 0, zone: 0, rec: 1, lastMulch: 0,
       caps: {},   // per plant slot: how many composts it has survived (level cap = 10 + 5 each)
@@ -6939,9 +6948,10 @@ const GAME = {
     return [Math.max(0, lo), Math.min(G.S.n - 1, hi)];
   },
   /* zoom target: 1 normally, zooming out as the view sinks below the mountain top */
+  zoomTop: () => (G.W < 520 ? 0.85 : 1),      // normal zoom: phones draw the world a bit smaller so more fits
   zoomTarget() {
     const d = GAME.mtnTop() - G.cam, minZ = U.clamp(G.H / (GAME.mtnTop() + 800), 0.3, 1);
-    return U.clamp(1 - Math.max(0, d - 350) / 1500, minZ, 1);
+    return Math.min(GAME.zoomTop(), U.clamp(1 - Math.max(0, d - 350) / 1500, minZ, 1));
   },
 
   /* ---------- plant identity (new weird plants every run; past runs are remembered for the mountain) ---------- */
@@ -7441,7 +7451,7 @@ const GAME = {
   draw() {
     const ctx = G.ctx, W = G.W, H = G.H, S = G.S, t = G.T, z = G.zoom, vW = G.vW, vH = G.vH, cx = vW / 2;
     const view = { W: vW, H: vH, cx, toY: GAME.toY, gap: ECON.GAP, cam: G.cam, zoom: z };
-    const near = z > 0.6;              // small labels and chatter only when not zoomed far out
+    const near = z > 0.55;              // small labels and chatter only when not zoomed far out
     const topV = ((UI.hudBottom || 0) + 8) / z;   // nothing important may be drawn above this (HUD covers it)
     ctx.save();
     GAME.safe("sky", () => WORLD.sky(ctx, W, H, GAME.camAlt(), t));
@@ -7450,7 +7460,7 @@ const GAME = {
     GAME.safe("ground", () => WORLD.ground(ctx, view, t));
     GAME.safe("buried", () => GAME.drawBuried(ctx, cx, t));
     GAME.safe("stalk", () => GAME.drawStalk(ctx, cx, t));
-    if (z < 0.95) GAME.safe("zoneLines", () => GAME.drawZoneLines(ctx, z, vW, vH));
+    if (z < GAME.zoomTop() - 0.05) GAME.safe("zoneLines", () => GAME.drawZoneLines(ctx, z, vW, vH));
     const [lo, hi] = GAME.visRange();
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     for (let i = lo; i <= hi; i++) {
@@ -7616,7 +7626,7 @@ const GAME = {
   },
   /* zoomed out: dashed lines + names where each zone starts, so you can read the mountain like a ruler */
   drawZoneLines(ctx, z, vW, vH) {
-    const S = G.S, a = U.clamp((0.95 - z) / 0.3, 0, 1);
+    const S = G.S, a = U.clamp((GAME.zoomTop() - 0.05 - z) / 0.3, 0, 1);
     ctx.save(); ctx.globalAlpha = a;
     ctx.setLineDash([12 / z, 10 / z]); ctx.lineWidth = 2 / z; ctx.strokeStyle = "rgba(255,243,220,0.75)";
     for (let k = 1; k <= S.zone + 1; k++) {
@@ -7756,6 +7766,9 @@ const CINE = {
 
   /* ---------- character wrappers (DRAW first, fallback otherwise) ---------- */
   gerald(ctx, x, y, s, o) {
+    // when he stands on a beanstalk this frame, the stalk itself is his neck (same look as in the game)
+    if (CINE._hadStalk && (!o || o.neck === undefined)) o = Object.assign({}, o, { neck: false });
+    CINE._hadStalk = false;
     ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
     if (!CINE._call("D", "gerald", ctx, o)) CINE._fbGerald(ctx, o);
     ctx.restore();
@@ -7899,18 +7912,34 @@ const CINE = {
   /* ---------- own props ---------- */
   /* beanstalk from ground point (bx,by) up to the head (hx,hy) */
   stalk(ctx, bx, by, hx, hy, s, t) {
+    // callers pass the point just under the head; the stalk now runs on up into the middle of the head
+    hy -= 34 * s; CINE._hadStalk = true;
     const C = INK.C, mx = (bx + hx) / 2 + Math.sin(t * 1.3) * 16 * s, my = (by + hy) / 2;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.beginPath(); ctx.moveTo(bx, by); ctx.quadraticCurveTo(mx, my, hx, hy);
     ctx.strokeStyle = C.ink; ctx.lineWidth = 13 * s + 6; ctx.stroke();
     ctx.strokeStyle = "#5cbf5c"; ctx.lineWidth = 13 * s; ctx.stroke();
     ctx.strokeStyle = "#7ed87e"; ctx.lineWidth = 3 * s; ctx.stroke();
-    const n = Math.min(14, Math.floor(Math.abs(by - hy) / (58 * s)));
+    const n = Math.min(14, Math.floor(Math.abs(by - hy - 60 * s) / (58 * s)));   // leaves stop below his chin
     ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5;
     for (let k = 1; k <= n; k++) {
-      const u = k / (n + 1), v = 1 - u, x = v * v * bx + 2 * u * v * mx + u * u * hx, y = v * v * by + 2 * u * v * my + u * u * hy, d = k % 2 ? 1 : -1;
+      const u = (k / (n + 1)) * (1 - 60 * s / Math.max(1, by - hy)), v = 1 - u, x = v * v * bx + 2 * u * v * mx + u * u * hx, y = v * v * by + 2 * u * v * my + u * u * hy, d = k % 2 ? 1 : -1;
       ctx.save(); ctx.translate(x, y); ctx.rotate(-d * (0.55 + Math.sin(t * 2 + k) * 0.15));
       INK.blob(ctx, d * 15 * s, 0, 15 * s, 6.5 * s, C.leaf, true, 80 + k); ctx.restore();
+    }
+  },
+  /* x of the stalk drawn by stalk(bx,by,hx,hy,s,t) at height y (for attaching branches) */
+  stalkX(bx, by, hx, hy, s, t, y) {
+    hy -= 34 * s;
+    const mx = (bx + hx) / 2 + Math.sin(t * 1.3) * 16 * s, u = U.clamp((by - y) / Math.max(1, by - hy), 0, 1), v = 1 - u;
+    return v * v * bx + 2 * u * v * mx + u * u * hx;
+  },
+  /* a branch from the stalk to a plant's stem base */
+  branch(ctx, sx, sy, ex, ey, s) {
+    const d = ex > sx ? 1 : -1;
+    for (const [w, col] of [[12 * s, INK.C.ink], [6.5 * s, "#5cbf5c"]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.bezierCurveTo(sx + d * 24 * s, sy + 6 * s, ex - d * 20 * s, ey + 10 * s, ex, ey); ctx.stroke();
     }
   },
   /* Gnome Dave, feet at (x,y) */
@@ -8538,6 +8567,13 @@ const CINE = {
           const a = -Math.PI * (0.08 + 0.84 * (k / 11)), d = q * (70 + (k % 4) * 30) * ts;
           INK.blob(ctx, wx + Math.cos(a) * d * 1.4, gy + Math.sin(a) * d + q * q * 140 * ts, 7 * ts * (1 - q * 0.5), 5 * ts, k % 2 ? "#6b4226" : "#4a2e18", true, 420 + k);
         }
+      }
+      /* branches from the stalk to every plant still on it (same look as in the game) */
+      for (let k = 0; k < n; k++) {
+        const e = v.slurpT != null ? t - v.slurpT - k * v.gap : -1;
+        if (e > 0) continue;
+        const d = k % 2 ? 1 : -1, px = sx + sway * (k / n) + d * 56 * ts, py = base - 70 * ts - k * 58 * ts, sy0 = py + 40 * ts;
+        CINE.branch(ctx, CINE.stalkX(sx, base + 6, sx + sway, headY + 34 * ts, ts, t, sy0), sy0, px, py + 44 * ts * 0.92, ts * 0.9);
       }
       /* plants */
       const nerv = v.nerv && v.slurpT == null;
@@ -9632,7 +9668,7 @@ const MAIN = {
       if (!CINE.active) { GAME.step(dt); QUESTS.update(dt); }
       // camera (zooms out while you look down into the compost mountain)
       G.zoom += (GAME.zoomTarget() - G.zoom) * Math.min(1, dt * 5);
-      if (Math.abs(G.zoom - 1) < 0.002) G.zoom = 1;
+      if (Math.abs(G.zoom - GAME.zoomTarget()) < 0.002) G.zoom = GAME.zoomTarget();
       G.vW = G.W / G.zoom; G.vH = G.H / G.zoom;
       const mx = GAME.camMax();
       if (G.follow) G.cam += (GAME.camFollow() - G.cam) * Math.min(1, dt * 3);
@@ -9673,6 +9709,7 @@ const MAIN = {
   input() {
     const cv = G.canvas;
     cv.addEventListener("pointerdown", e => {
+      if (UI.mobile() && $("panel").classList.contains("open")) UI.sheet(false);   // tapping the game closes the sheet
       const [x, y] = MAIN.pt(e);
       MAIN.drag = { x, y, cam: G.cam, moved: false };
       G.mouse.x = x; G.mouse.y = y; G.mouse.in = true;

@@ -5,7 +5,7 @@ const STATE = {
     return {
       v: 3, sd: (Math.random() * 1e9) | 0, u: 0,
       // this run (reset by composting)
-      m: 0, run: 0, n: 1, lv: {}, bk: {}, ac: {}, shop: {}, runT: 0,
+      m: 0, run: 0, n: 1, lv: {}, bk: { 0: 50 }, ac: {}, shop: {}, runT: 0,   // first plant starts with a $50 bubble for the tutorial
       // permanent
       soc: 0, mu: 0, tm: 0, perk: {}, mtn: 0, strata: [], cc: 0, zone: 0, rec: 1, lastMulch: 0,
       caps: {},   // per plant slot: how many composts it has survived (level cap = 10 + 5 each)

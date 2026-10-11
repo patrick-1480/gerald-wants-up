@@ -31,9 +31,10 @@ const GAME = {
     return [Math.max(0, lo), Math.min(G.S.n - 1, hi)];
   },
   /* zoom target: 1 normally, zooming out as the view sinks below the mountain top */
+  zoomTop: () => (G.W < 520 ? 0.85 : 1),      // normal zoom: phones draw the world a bit smaller so more fits
   zoomTarget() {
     const d = GAME.mtnTop() - G.cam, minZ = U.clamp(G.H / (GAME.mtnTop() + 800), 0.3, 1);
-    return U.clamp(1 - Math.max(0, d - 350) / 1500, minZ, 1);
+    return Math.min(GAME.zoomTop(), U.clamp(1 - Math.max(0, d - 350) / 1500, minZ, 1));
   },
 
   /* ---------- plant identity (new weird plants every run; past runs are remembered for the mountain) ---------- */
@@ -533,7 +534,7 @@ const GAME = {
   draw() {
     const ctx = G.ctx, W = G.W, H = G.H, S = G.S, t = G.T, z = G.zoom, vW = G.vW, vH = G.vH, cx = vW / 2;
     const view = { W: vW, H: vH, cx, toY: GAME.toY, gap: ECON.GAP, cam: G.cam, zoom: z };
-    const near = z > 0.6;              // small labels and chatter only when not zoomed far out
+    const near = z > 0.55;              // small labels and chatter only when not zoomed far out
     const topV = ((UI.hudBottom || 0) + 8) / z;   // nothing important may be drawn above this (HUD covers it)
     ctx.save();
     GAME.safe("sky", () => WORLD.sky(ctx, W, H, GAME.camAlt(), t));
@@ -542,7 +543,7 @@ const GAME = {
     GAME.safe("ground", () => WORLD.ground(ctx, view, t));
     GAME.safe("buried", () => GAME.drawBuried(ctx, cx, t));
     GAME.safe("stalk", () => GAME.drawStalk(ctx, cx, t));
-    if (z < 0.95) GAME.safe("zoneLines", () => GAME.drawZoneLines(ctx, z, vW, vH));
+    if (z < GAME.zoomTop() - 0.05) GAME.safe("zoneLines", () => GAME.drawZoneLines(ctx, z, vW, vH));
     const [lo, hi] = GAME.visRange();
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     for (let i = lo; i <= hi; i++) {
@@ -708,7 +709,7 @@ const GAME = {
   },
   /* zoomed out: dashed lines + names where each zone starts, so you can read the mountain like a ruler */
   drawZoneLines(ctx, z, vW, vH) {
-    const S = G.S, a = U.clamp((0.95 - z) / 0.3, 0, 1);
+    const S = G.S, a = U.clamp((GAME.zoomTop() - 0.05 - z) / 0.3, 0, 1);
     ctx.save(); ctx.globalAlpha = a;
     ctx.setLineDash([12 / z, 10 / z]); ctx.lineWidth = 2 / z; ctx.strokeStyle = "rgba(255,243,220,0.75)";
     for (let k = 1; k <= S.zone + 1; k++) {

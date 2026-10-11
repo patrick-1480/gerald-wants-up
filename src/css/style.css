@@ -174,40 +174,49 @@ textarea { width: 100%; height: 90px; background: var(--pn2); color: var(--cream
 }
 /* ---------- phones (portrait): full-screen game + bottom tab bar + slide-up sheet ---------- */
 @media (max-width: 760px) {
-  :root { --navH: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  :root { --navH: calc(56px + env(safe-area-inset-bottom, 0px)); }
   body { padding: 0; font-size: 17px; }
   #app { display: block; padding: 0; height: 100dvh; }
   #stage { position: fixed; left: 0; right: 0; top: 0; bottom: var(--navH); border: none; border-radius: 0; box-shadow: none; padding-top: env(safe-area-inset-top, 0px); }
   #panel { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: min(64dvh, 560px); border-radius: 22px 22px 0 0; border-width: 3px 0 0; box-shadow: 0 -4px 0 var(--ink);
     display: flex; flex-direction: column; transform: translateY(calc(100% - var(--navH))); transition: transform .28s cubic-bezier(.3,1.2,.5,1); }
   #panel.open { transform: none; }
-  #tabs { flex: none; height: 58px; padding: 6px 6px 0; border-bottom: 3px solid var(--ink); align-items: center; }
+  #tabs { flex: none; height: 56px; padding: 5px 5px 0; border-bottom: 3px solid var(--ink); align-items: center; gap: 3px; }
   #panel:not(.open) #tabs { padding-bottom: env(safe-area-inset-bottom, 0px); }
-  #tabs button { border-radius: 14px; border-bottom: 3px solid var(--ink); padding: 4px 2px; height: 46px; justify-content: center; }
+  #tabs button { border-radius: 12px; border-bottom: 3px solid var(--ink); padding: 3px 2px; height: 44px; justify-content: center; font-size: 17px; }
   #tabs button.on { transform: none; }
   #panel:not(.open) #tabs button.on { background: var(--pn); color: var(--dim); }
   #tabs button span { font-size: 11px; }
-  #sheetGrab { display: block !important; order: -1; height: 26px; }
+  #sheetGrab { display: none !important; }
   .tab { padding: 10px 10px 14px; }
-  #hudLeft { top: 8px; left: 8px; min-width: 0; padding: 5px 10px; }
-  .money { font-size: 25px; }
-  .sub { font-size: 14px; }
-  .chip { font-size: 14px; }
-  #objective { top: 100px; left: 8px; right: 58px; width: auto; transform: none; padding: 5px 10px; }
-  .objTop { font-size: 15px; }
-  #objSub { font-size: 13px; }
-  #hudRight { top: 8px; right: 8px; }
-  .round { width: 40px; height: 40px; }
-  #altMeter { display: none; }
-  #ticker { left: 8px; right: 8px; bottom: 8px; height: 28px; border-width: 2px; }
-  #ticker b { font-size: 12px; padding: 0 7px; }
-  #tickerText { font-size: 15px; }
-  #tutor { bottom: 44px; padding: 8px 10px; gap: 8px; }
-  #tutFace { width: 58px; height: 58px; }
-  .tutBody p { font-size: 17px; }
+  .card { border-width: 2px; box-shadow: 0 3px 0 var(--ink); }
+  #hudLeft { top: 6px; left: 6px; min-width: 0; padding: 4px 9px; }
+  .money { font-size: 21px; }
+  #hudLeft .sub { font-size: 12px; }
+  .chips { gap: 4px; margin-top: 2px; }
+  .chip { font-size: 12px; padding: 0 6px; }
+  #hud #objective { top: 6px; left: auto; right: 48px; width: calc(100% - 178px); max-width: 300px; transform: none; padding: 4px 8px; }
+  #hud .objTop { font-size: 12.5px; line-height: 1.05; gap: 5px; }
+  .objIcon { font-size: 14px; }
+  #objSub { font-size: 10.5px; }
+  #objective .bar { height: 7px; margin: 3px 0 1px; }
+  #hudRight { top: 6px; right: 6px; gap: 4px; }
+  .round { width: 36px; height: 36px; font-size: 15px; border-width: 2px; box-shadow: 0 2px 0 var(--ink); }
+  #altMeter, #ticker { display: none; }
+  #tutor { bottom: 8px; width: calc(100% - 16px); padding: 6px 9px; gap: 7px; border-width: 3px; box-shadow: 0 4px 0 var(--ink); }
+  #tutFace { width: 40px; height: 40px; }
+  .tutBody b { font-size: 14px; }
+  .tutBody p { font-size: 14.5px; line-height: 1.12; margin: 1px 0 4px; }
+  #tutBtns .btn { font-size: 13px; padding: 3px 10px; box-shadow: 0 3px 0 var(--ink); }
+  #tutArrow::before { font-size: 30px; left: -16px; top: -44px; }
+  .pop { font-size: 13px; padding: 7px; }
+  .pop .hd b { font-size: 15px; }
+  .pop .mr .btn { font-size: 12.5px; padding: 5px 4px; }
+  .toast { font-size: 14px; padding: 5px 10px; }
+  .btn.big { font-size: 18px; padding: 9px; }
   /* plant menu docks to the bottom of the game view */
-  .pop.docked { left: 8px !important; right: 8px; top: auto !important; bottom: 44px; width: auto; }
-  #toasts { bottom: calc(var(--navH) + 46px); }
+  .pop.docked { left: 6px !important; right: 6px; top: auto !important; bottom: 6px; width: auto; }
+  #toasts { bottom: calc(var(--navH) + 12px); }
   .row .btn { min-width: 84px; }
 }
 #sheetGrab { flex: none; text-align: center; padding: 4px 0 0; }

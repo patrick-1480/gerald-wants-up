@@ -74,7 +74,7 @@ const MAIN = {
       if (!CINE.active) { GAME.step(dt); QUESTS.update(dt); }
       // camera (zooms out while you look down into the compost mountain)
       G.zoom += (GAME.zoomTarget() - G.zoom) * Math.min(1, dt * 5);
-      if (Math.abs(G.zoom - 1) < 0.002) G.zoom = 1;
+      if (Math.abs(G.zoom - GAME.zoomTarget()) < 0.002) G.zoom = GAME.zoomTarget();
       G.vW = G.W / G.zoom; G.vH = G.H / G.zoom;
       const mx = GAME.camMax();
       if (G.follow) G.cam += (GAME.camFollow() - G.cam) * Math.min(1, dt * 3);
@@ -115,6 +115,7 @@ const MAIN = {
   input() {
     const cv = G.canvas;
     cv.addEventListener("pointerdown", e => {
+      if (UI.mobile() && $("panel").classList.contains("open")) UI.sheet(false);   // tapping the game closes the sheet
       const [x, y] = MAIN.pt(e);
       MAIN.drag = { x, y, cam: G.cam, moved: false };
       G.mouse.x = x; G.mouse.y = y; G.mouse.in = true;

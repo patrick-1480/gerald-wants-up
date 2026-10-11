@@ -44,6 +44,9 @@ const CINE = {
 
   /* ---------- character wrappers (DRAW first, fallback otherwise) ---------- */
   gerald(ctx, x, y, s, o) {
+    // when he stands on a beanstalk this frame, the stalk itself is his neck (same look as in the game)
+    if (CINE._hadStalk && (!o || o.neck === undefined)) o = Object.assign({}, o, { neck: false });
+    CINE._hadStalk = false;
     ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
     if (!CINE._call("D", "gerald", ctx, o)) CINE._fbGerald(ctx, o);
     ctx.restore();
@@ -187,18 +190,34 @@ const CINE = {
   /* ---------- own props ---------- */
   /* beanstalk from ground point (bx,by) up to the head (hx,hy) */
   stalk(ctx, bx, by, hx, hy, s, t) {
+    // callers pass the point just under the head; the stalk now runs on up into the middle of the head
+    hy -= 34 * s; CINE._hadStalk = true;
     const C = INK.C, mx = (bx + hx) / 2 + Math.sin(t * 1.3) * 16 * s, my = (by + hy) / 2;
     ctx.lineCap = "round"; ctx.lineJoin = "round";
     ctx.beginPath(); ctx.moveTo(bx, by); ctx.quadraticCurveTo(mx, my, hx, hy);
     ctx.strokeStyle = C.ink; ctx.lineWidth = 13 * s + 6; ctx.stroke();
     ctx.strokeStyle = "#5cbf5c"; ctx.lineWidth = 13 * s; ctx.stroke();
     ctx.strokeStyle = "#7ed87e"; ctx.lineWidth = 3 * s; ctx.stroke();
-    const n = Math.min(14, Math.floor(Math.abs(by - hy) / (58 * s)));
+    const n = Math.min(14, Math.floor(Math.abs(by - hy - 60 * s) / (58 * s)));   // leaves stop below his chin
     ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5;
     for (let k = 1; k <= n; k++) {
-      const u = k / (n + 1), v = 1 - u, x = v * v * bx + 2 * u * v * mx + u * u * hx, y = v * v * by + 2 * u * v * my + u * u * hy, d = k % 2 ? 1 : -1;
+      const u = (k / (n + 1)) * (1 - 60 * s / Math.max(1, by - hy)), v = 1 - u, x = v * v * bx + 2 * u * v * mx + u * u * hx, y = v * v * by + 2 * u * v * my + u * u * hy, d = k % 2 ? 1 : -1;
       ctx.save(); ctx.translate(x, y); ctx.rotate(-d * (0.55 + Math.sin(t * 2 + k) * 0.15));
       INK.blob(ctx, d * 15 * s, 0, 15 * s, 6.5 * s, C.leaf, true, 80 + k); ctx.restore();
+    }
+  },
+  /* x of the stalk drawn by stalk(bx,by,hx,hy,s,t) at height y (for attaching branches) */
+  stalkX(bx, by, hx, hy, s, t, y) {
+    hy -= 34 * s;
+    const mx = (bx + hx) / 2 + Math.sin(t * 1.3) * 16 * s, u = U.clamp((by - y) / Math.max(1, by - hy), 0, 1), v = 1 - u;
+    return v * v * bx + 2 * u * v * mx + u * u * hx;
+  },
+  /* a branch from the stalk to a plant's stem base */
+  branch(ctx, sx, sy, ex, ey, s) {
+    const d = ex > sx ? 1 : -1;
+    for (const [w, col] of [[12 * s, INK.C.ink], [6.5 * s, "#5cbf5c"]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.bezierCurveTo(sx + d * 24 * s, sy + 6 * s, ex - d * 20 * s, ey + 10 * s, ex, ey); ctx.stroke();
     }
   },
   /* Gnome Dave, feet at (x,y) */
@@ -826,6 +845,13 @@ const CINE = {
           const a = -Math.PI * (0.08 + 0.84 * (k / 11)), d = q * (70 + (k % 4) * 30) * ts;
           INK.blob(ctx, wx + Math.cos(a) * d * 1.4, gy + Math.sin(a) * d + q * q * 140 * ts, 7 * ts * (1 - q * 0.5), 5 * ts, k % 2 ? "#6b4226" : "#4a2e18", true, 420 + k);
         }
+      }
+      /* branches from the stalk to every plant still on it (same look as in the game) */
+      for (let k = 0; k < n; k++) {
+        const e = v.slurpT != null ? t - v.slurpT - k * v.gap : -1;
+        if (e > 0) continue;
+        const d = k % 2 ? 1 : -1, px = sx + sway * (k / n) + d * 56 * ts, py = base - 70 * ts - k * 58 * ts, sy0 = py + 40 * ts;
+        CINE.branch(ctx, CINE.stalkX(sx, base + 6, sx + sway, headY + 34 * ts, ts, t, sy0), sy0, px, py + 44 * ts * 0.92, ts * 0.9);
       }
       /* plants */
       const nerv = v.nerv && v.slurpT == null;
