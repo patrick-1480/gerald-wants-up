@@ -5,3 +5,6 @@ steam/steampipe/output/
 
 # web build tools
 node_modules/
+
+# local bot (developer toy)
+bot/

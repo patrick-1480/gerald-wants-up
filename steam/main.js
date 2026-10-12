@@ -9,6 +9,11 @@ const APP_ID = Number(process.env.STEAM_APP_ID) || pkg.steamAppId || 480;   // 4
 const CLOUD_FILE = 'gerald_save.json';
 const SELFTEST = process.argv.includes('--selftest');   // npm run selftest: boots, screenshots, prints Steam status, quits
 if (SELFTEST) app.setPath('userData', path.join(app.getPath('temp'), 'gerald-selftest'));   // never touches the real save
+// developer copy only (never the release .exe): --profile=NAME uses a separate save, --bot=FILE plays by itself
+const argOf = k => { const a = process.argv.find(x => x.startsWith('--' + k + '=')); return a ? a.slice(k.length + 3).replace(/^"|"$/g, '') : null; };
+const PROFILE = !app.isPackaged && argOf('profile');
+const BOT = !app.isPackaged && argOf('bot');
+if (PROFILE) app.setPath('userData', path.join(app.getPath('appData'), 'Gerald Wants Up (' + PROFILE.replace(/[^\w -]/g, '') + ')'));
 
 if (!app.requestSingleInstanceLock()) app.exit(0);     // two copies would fight over the save
 // release builds refuse to start with debugging switches (they would let someone poke at the running game)
@@ -20,6 +25,7 @@ try {
   steamworks = require('steamworks.js');
   // a shipped build has to be started by Steam: if someone runs the .exe directly, Steam relaunches it properly
   if (app.isPackaged && APP_ID !== 480 && steamworks.restartAppIfNecessary(APP_ID)) app.exit(0);
+  if (BOT) throw new Error('bot mode: Steam stays off (no achievements, no cloud)');
   client = steamworks.init(APP_ID);
 } catch (e) {
   client = null;
@@ -53,6 +59,7 @@ ipcMain.on('steam:info', e => { e.returnValue = steamInfo(); });
 // Steam's server clock (seconds since 1970): offline rewards use this, so changing the PC's date does nothing
 ipcMain.on('steam:time', e => { e.returnValue = client ? safe(() => client.utils.getServerRealTime(), null) : null; });
 ipcMain.on('app:selftest', e => { e.returnValue = SELFTEST; });
+ipcMain.on('app:bot', e => { e.returnValue = !!BOT; });
 ipcMain.on('save:boot', e => {
   e.returnValue = {
     file: safe(() => fs.readFileSync(saveFile(), 'utf8'), null),
@@ -93,9 +100,9 @@ function createWindow() {
   const wa = screen.getPrimaryDisplay().workAreaSize, p = prefs(), deck = !!(client && steamInfo().deck);
   win = new BrowserWindow({
     width: Math.min(1440, wa.width), height: Math.min(900, wa.height), minWidth: 900, minHeight: 560,
-    fullscreen: deck || !!p.full, backgroundColor: '#1d0f2b', title: 'Gerald Wants Up', show: false,
+    fullscreen: !BOT && (deck || !!p.full), backgroundColor: '#1d0f2b', title: BOT ? 'Gerald Wants Up - BOT' : 'Gerald Wants Up', show: false,
     icon: path.join(__dirname, 'build', 'icon.png'),
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, devTools: DEV, spellcheck: false },
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, devTools: DEV, spellcheck: false, backgroundThrottling: !BOT },
   });
   Menu.setApplicationMenu(null);
   win.once('ready-to-show', () => win.show());
@@ -110,6 +117,22 @@ function createWindow() {
   });
   win.on('closed', () => { win = null; });
   if (SELFTEST) selftest();
+  if (BOT) {          // the bot plays through the page like a person: it reads the screen and clicks (see bot/bot.js)
+    win.on('page-title-updated', e => e.preventDefault());
+    win.webContents.on('did-finish-load', () => {
+      let code = '';
+      try { code = fs.readFileSync(BOT, 'utf8'); } catch (e) { console.error('[bot] cannot read', BOT, e.message); return; }
+      win.webContents.executeJavaScript(code).catch(e => console.error('[bot] crashed:', e && e.message));
+    });
+    win.webContents.on('console-message', (e, level, msg) => { if (/^\[bot\]/.test(msg) || level >= 3) console.log(msg); });
+    const test = +process.env.GWU_BOT_TEST || 0;        // developer check: run the bot N seconds, report, screenshot, quit
+    if (test) setTimeout(async () => {
+      const r = await win.webContents.executeJavaScript('JSON.stringify({ hud: document.getElementById("botHud").innerText, money: document.getElementById("hudMoney").textContent, goal: document.getElementById("objSub").textContent })').catch(e => e.message);
+      console.log('[bot-test]', r);
+      fs.writeFileSync(path.join(app.getPath('temp'), 'gerald-bot-test.png'), (await win.webContents.capturePage()).toPNG());
+      app.quit();
+    }, test * 1000);
+  }
 }
 async function selftest() {
   const out = path.join(app.getPath('temp'), 'gerald-selftest'), wc = win.webContents, wait = ms => new Promise(r => setTimeout(r, ms));

@@ -112,7 +112,12 @@ const MAIN = {
       const mx = GAME.camMax();
       if (G.fling) {        // touch flick momentum
         if (G.follow || G.camTo !== null || MAIN.drag) G.fling = 0;
-        else { G.cam += G.fling * dt; G.fling *= Math.exp(-3.2 * dt); if (Math.abs(G.fling) < 30) G.fling = 0; if (G.cam >= mx - 30 && G.fling > 0) { G.fling = 0; G.follow = true; } }
+        else {
+          G.cam += G.fling * dt; G.fling *= Math.exp(-2.1 * dt);               // glides, then slows down smoothly
+          if (Math.abs(G.fling) * G.zoom < 18) G.fling = 0;
+          if (G.cam >= mx - 30 && G.fling > 0) { G.fling = 0; G.follow = true; }   // flicked all the way up: follow Gerald again
+          if (G.cam <= -90 && G.fling < 0) G.fling = 0;                          // hit the bottom
+        }
       }
       if (G.follow) G.cam += (GAME.camFollow() - G.cam) * Math.min(1, dt * 3);
       else if (G.camTo !== null) { G.cam += (G.camTo - G.cam) * Math.min(1, dt * 4); if (Math.abs(G.camTo - G.cam) < 2) G.camTo = null; }
@@ -157,7 +162,7 @@ const MAIN = {
       const [x, y] = MAIN.pt(e), touch = e.pointerType !== "mouse";
       G.mouse.x = x; G.mouse.y = y; G.mouse.in = true; G.fling = 0;
       if (G.started && !CINE.active && GAME.catchAt(x, y, touch)) { MAIN.drag = null; return; }   // socks: caught on press
-      MAIN.drag = { x, y, ly: y, lt: performance.now(), v: 0, moved: false, tol: touch ? 11 : 7 };
+      MAIN.drag = { x, y, ly: y, lt: performance.now(), moved: false, tol: touch ? 11 : 7, hist: [[performance.now(), y]] };
       cv.setPointerCapture(e.pointerId);
     });
     cv.addEventListener("pointermove", e => {
@@ -168,8 +173,9 @@ const MAIN = {
         if (Math.abs(y - d.y) > d.tol || Math.abs(x - d.x) > d.tol) d.moved = true;
         if (d.moved) {
           // relative to the last move (not the press point), so the camera never runs away while the zoom changes
-          const now = performance.now(), dy = (y - d.ly) / G.zoom, dt = Math.max(1, now - d.lt) / 1000;
-          d.v = d.v * 0.5 + (dy / dt) * 0.5; d.ly = y; d.lt = now;
+          const now = performance.now(), dy = (y - d.ly) / G.zoom;
+          d.ly = y; d.lt = now;
+          d.hist.push([now, y]); while (d.hist.length > 2 && now - d.hist[0][0] > 150) d.hist.shift();   // recent finger positions
           G.follow = false; G.camTo = null; G.cam = U.clamp(G.cam + dy, -90, GAME.camMax());
           if (G.cam >= GAME.camMax() - 30) G.follow = true;
         }
@@ -179,7 +185,13 @@ const MAIN = {
       const d = MAIN.drag; MAIN.drag = null;
       if (!d) return;
       if (!d.moved) { if (G.started && !CINE.active) { const [x, y] = MAIN.pt(e); GAME.click(x, y, e.pointerType !== "mouse"); } }
-      else if (performance.now() - d.lt < 90 && Math.abs(d.v) > 250 && !G.follow) G.fling = U.clamp(d.v, -9000, 9000);   // flick to keep scrolling
+      else {          // flick: keep gliding at the speed of the last ~0.1 s of the swipe, like a phone list
+        const now = performance.now(), h = d.hist.filter(p => now - p[0] < 110);
+        if (h.length >= 2 && now - d.lt < 90) {
+          const a = h[0], b = h[h.length - 1], v = (b[1] - a[1]) / Math.max(0.008, (b[0] - a[0]) / 1000);   // screen px per second
+          if (Math.abs(v) > 120) { G.fling = U.clamp(v, -14000, 14000) / G.zoom; G.follow = false; G.camTo = null; }
+        }
+      }
     });
     cv.addEventListener("pointercancel", () => (MAIN.drag = null));
     cv.addEventListener("pointerleave", () => { if (!MAIN.drag) G.mouse.in = false; });

@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('steamBridge', {
   info: () => ipcRenderer.sendSync('steam:info'),
   serverTime: () => ipcRenderer.sendSync('steam:time'),
   isSelftest: () => ipcRenderer.sendSync('app:selftest'),
+  isBot: () => ipcRenderer.sendSync('app:bot'),
   bootSaves: () => ipcRenderer.sendSync('save:boot'),
   writeSave: json => ipcRenderer.invoke('save:write', json),
   writeSaveSync: json => ipcRenderer.sendSync('save:write-sync', json),   // used while closing, so nothing is lost

@@ -188,6 +188,19 @@ const STEAM = {
   init() {
     STEAM.info = STEAM.call("info") || STEAM.info;
     GUARD.CLOCK.src = () => STEAM.call("serverTime");     // offline time comes from Steam's servers, not the PC clock
+    // developer bot (bot/bot.js, unpackaged copy only): it gets to SEE where things are on the canvas, nothing more.
+    // Everything it does goes through the normal screen: tabs, buttons and clicks.
+    if (STEAM.call("isBot")) window.__gwuSee = () => {
+      const z = G.zoom, gy = GAME.toY(GAME.geraldWY()) * z, c = G.canvas.getBoundingClientRect();
+      return {
+        canvas: { left: c.left, top: c.top, w: c.width, h: c.height },
+        bubbles: GAME.bubbleHit.map(b => ({ x: b.x * z, y: b.y * z, r: b.r * z })),
+        socks: GAME.socks.map(k => ({ x: k.x, y: k.y, gold: !!k.gold })),
+        visitors: GAME.visitors.map(o => { const p = GAME.visitorPos(o); return { x: p[0], y: p[1] }; }),
+        gerald: { x: G.vW / 2 * z, y: gy, on: gy > 30 && gy < G.H - 30 },
+        ghost: GAME.ghost && GAME.ghost.y * z > 0 && GAME.ghost.y * z < G.H ? { x: GAME.ghost.x * z, y: GAME.ghost.y * z } : null,
+      };
+    };
     if (STEAM.call("isSelftest")) window.__gwu = {   // npm run selftest only (devtools are off in release builds)
       get G() { return G; }, get MAIN() { return MAIN; }, get UI() { return UI; }, STATE, GUARD, STEAM };
     try { STEAM.got = JSON.parse(localStorage.getItem("gwu_ach") || "{}") || {}; } catch (e) { STEAM.got = {}; }
