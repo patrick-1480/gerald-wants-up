@@ -29,6 +29,9 @@ const MAIN = {
       return;
     }
     GUARD.setLive(true);
+    if (S.superT > 0) { GAME.buffs.super = S.superT; GAME.refreshPay(); }   // a Super Frenzy that was running when you left
+    for (let i = 0; i < S.n; i++) GAME.recordDex(i, true);                  // plants you already have count for the Plantdex
+    GAME.lastGrowT = S.runT;
     $("title").style.transition = "opacity .6s"; $("title").style.opacity = 0;
     setTimeout(() => $("title").classList.add("hidden"), 600);
     G.started = true;
@@ -118,6 +121,7 @@ const MAIN = {
       UI.placeMenu(); TUT.update(dt);
       if (UI.tab === "quests") UI.drawQuestIcons();
       MAIN.uiT += dt; if (MAIN.uiT > 0.15) { MAIN.uiT = 0; UI.update(); }
+      MAIN.trT = (MAIN.trT || 0) + dt; if (MAIN.trT > 1) { MAIN.trT = 0; if (!CINE.active) TROPHY.check(); }
       MAIN.musT += dt; if (MAIN.musT > 1) { MAIN.musT = 0; MAIN.musicCheck(); }
       MAIN.saveT += dt; if (MAIN.saveT > 5) { MAIN.saveT = 0; STATE.save(G.S); }
     }

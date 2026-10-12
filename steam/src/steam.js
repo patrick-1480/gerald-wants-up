@@ -21,7 +21,10 @@ const STEAM = {
     ["ACH_SUN", "Please Take a Number", "Reach the Sun's Waiting Room.", "tall", S => S.zone >= 9],
     ["ACH_FOURTH_WALL", "Hello?", "Reach the Fourth Wall.", "tall", S => S.zone >= 14],
     ["ACH_ENDLESS", "Off Script", "Climb past the Fourth Wall into the endless layers.", "tall", S => S.zone >= 15],
-    ["ACH_LAYER_10", "Still Going", "Reach Layer 10.", "tall", S => S.zone >= 24],
+    ["ACH_LAYER_10", "Still Going", "Reach Layer 10.", "tall", S => (S.best ? S.best.zone : S.zone) >= 24],
+    ["ACH_LAYER_25", "Deep Space", "Reach Layer 25.", "tall", S => S.best.zone >= 39],
+    ["ACH_LAYER_35", "Way Out There", "Reach Layer 35.", "tall", S => S.best.zone >= 49],
+    ["ACH_LAYER_50", "Somewhere Near the Top?", "Reach Layer 50.", "tall", S => S.best.zone >= 64],
     ["ACH_COMPOST", "Feed the Worm", "Compost for the first time.", "compost", S => S.stats.composts >= 1],
     ["ACH_COMPOST_10", "Mountain Maker", "Compost 10 times.", "compost", S => S.stats.composts >= 10],
     ["ACH_COMPOST_50", "Mt. Compost", "Compost 50 times.", "compost", S => S.stats.composts >= 50],
@@ -37,6 +40,21 @@ const STEAM = {
     ["ACH_GOOGOL", "Googol Gardener", "Earn a googol dollars ($1e100) in total.", "earn", S => S.stats.earnL >= 100],
     ["ACH_HATS", "Hat Trick", "Collect 10 hats for Gerald.", "hat", S => Object.keys(S.hats || {}).length - 1 >= 10],
     ["ACH_RELICS", "Collector", "Find 10 relics.", "bubbles", S => Object.keys(S.relics || {}).length >= 10],
+    ["ACH_GOLDEN_SOCK", "Midas Sock", "Catch a Golden Sock.", "gsock", S => (S.stats.gsocks || 0) >= 1],
+    ["ACH_SUPER_FRENZY", "Bonkers", "Start a Super Frenzy.", "gsock", S => (S.stats.superF || 0) >= 1],
+    ["ACH_TRANSPLANT", "New Pot", "Transplant Gerald to a new planet.", "planet", S => (S.stats.transplants || 0) >= 1],
+    ["ACH_TRANSPLANT_10", "Frequent Flyer", "Transplant 10 times.", "planet", S => (S.stats.transplants || 0) >= 10],
+    ["ACH_TRANSPLANT_50", "Planet Collector", "Transplant 50 times.", "planet", S => (S.stats.transplants || 0) >= 50],
+    ["ACH_STARDUST", "Stargazer", "Earn 1,000 Stardust in total.", "star", S => (S.dustEver || 0) >= 1000],
+    ["ACH_WEIRD", "Weird", "Finish a tier of a Weird Run.", "weird", S => Object.values(S.chalT || {}).some(t => t >= 1)],
+    ["ACH_WEIRD_ALL", "Weirdest of All", "Finish all 5 tiers of every Weird Run.", "weird", S => ECON.CHALS.every(c => (S.chalT || {})[c.id] >= 5)],
+    ["ACH_SHINY", "Shiny!", "Find a shiny plant.", "shiny", S => ECON.shinyCount(S) >= 1],
+    ["ACH_SHINY_ALL", "Gotta Grow 'Em All", "Find a shiny of every plant species.", "shiny", S => ECON.shinyCount(S) >= DATA.SPECIES.length],
+    ["ACH_PLANTDEX", "Plantdex Complete", "Find every plant variant.", "dex", S => ECON.dexCount(S) >= DATA.SPECIES.length * 10],
+    ["ACH_TROPHIES_50", "Trophy Cabinet", "Earn 50 trophies.", "trophy", S => ECON.trophyCount(S) >= 50],
+    ["ACH_TROPHIES_ALL", "Every Trophy", "Earn every trophy.", "trophy", S => TROPHY.LIST.length > 0 && ECON.trophyCount(S) >= TROPHY.LIST.length],
+    ["ACH_LANDMARK", "Sightseer", "Reach a Cosmic Landmark.", "landmark", S => (S.marks || 0) >= 1],
+    ["ACH_HUNDRED_HOURS", "Gerald's Best Friend", "Play for 100 hours.", "time", S => S.stats.time >= 360000],
   ],
   call(fn, ...a) { try { return STEAM.B && STEAM.B[fn] ? STEAM.B[fn](...a) : undefined; } catch (e) { console.warn("steam", fn, e); } },
 
@@ -80,8 +98,8 @@ const STEAM = {
     }
     if (!fresh.length) return;
     try { localStorage.setItem("gwu_ach", JSON.stringify(STEAM.got)); } catch (e) {}
-    UI.toast(fresh.length > 2 ? "🏆 " + fresh.length + " achievements unlocked!" : fresh.map(n => "🏆 Achievement unlocked: " + n).join("  ·  "), "ach", 4.5);   // an old save catching up unlocks a pile at once
-    SFX.play("upgrade", { n: 5 });
+    // no in-game toast: Steam shows its own popup, and the game's Trophies already celebrate
+    if (!STEAM.info.ok) UI.toast(fresh.length > 2 ? "🏆 " + fresh.length + " Steam achievements unlocked!" : fresh.map(n => "🏆 Steam achievement: " + n).join("  ·  "), "ach", 4.5);
     if (UI.tab === "settings") STEAM.drawAch();
   },
   presence() {
@@ -160,6 +178,8 @@ const STEAM = {
   /* achievement pictures, from the game's own drawings (fits 64x64 around 0,0) */
   icon(x, type, t) {
     if (type === "moon") { x.strokeStyle = INK.C.ink; x.lineWidth = 2.5; DRAW.moonFace(x, 24, { t, mood: "smug", look: { x: -0.5, y: 0.5 } }); return; }
+    const EMO = { gsock: "🧦", planet: "🪐", star: "⭐", weird: "🌀", shiny: "💎", dex: "📗", trophy: "🏆", landmark: "🗿", time: "⏳" };
+    if (EMO[type]) { x.font = "36px 'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(EMO[type], 0, 2); return; }
     if (type === "hat") { x.scale(0.55, 0.55); x.translate(0, 18); DRAW.gerald(x, { t, spit: 0, look: { x: 0.4, y: -0.2 }, hat: "tophat", mood: "grump", blink: 0, neck: false }); return; }
     x.scale(1.2, 1.2); DRAW.questIcon(x, type, 50, t);
   },

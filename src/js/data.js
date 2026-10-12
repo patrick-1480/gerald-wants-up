@@ -133,6 +133,14 @@ DATA.RELICS = [
 ];
 window.RELICS = DATA.RELICS;
 
+/* ---------- Cosmic Landmarks: one every 10 endless layers (all payouts x2 each) ---------- */
+DATA.LANDMARKS = ["The Big Ladder", "A Second Moon (Smaller)", "The Gnome Embassy", "The Lost and Found of Everything",
+  "A Very Tall Chair", "The Sky's Belly Button", "The Bean Monument", "A Door Marked UP", "The Cloud Factory",
+  "Wormsley's Holiday Home", "A Sign That Says NEARLY THERE", "The Top (Not The Top)", "A Bench for Tired Stalks",
+  "The Museum of Gerald", "An Escalator, Broken", "The Sock Singularity", "A Lighthouse for Beans", "The Final Final Floor",
+  "Somebody's Attic Again", "The Upstairs Neighbours"];
+DATA.landmark = k => (k <= DATA.LANDMARKS.length ? DATA.LANDMARKS[k - 1] : "Landmark #" + k);
+
 /* ---------- hats (cosmetic) ---------- */
 DATA.HATS = [
   { id: "none", name: "No Hat (brave)" },

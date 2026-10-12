@@ -17,7 +17,8 @@ const QUESTS = {
     if (q.t === "earn") return q.acc || 0;
     return QUESTS.abs(q.t) ? QUESTS.stat(q.t) : QUESTS.stat(q.t) - q.base;
   },
-  cash() { const S = G.S; return Math.max(ECON.ips(S) * 60, ECON.spC(S, S.n) * 0.1); },   // ~1 minute of income
+  cash() { const S = G.S; return Math.max(ECON.ips(S) * 60, ECON.spC(S, S.n) * 0.1) * QUESTS.mult(); },   // ~1 minute of income
+  mult: () => 2 ** ECON.starL(G.S, "busy"),     // Busy Body: quest rewards x2 per level
   label(q) { return q.t === "earn" ? U.money(q.n) : U.num(q.n); },
   nice(x) { const e = 10 ** Math.floor(Math.log10(x) - 1); return Math.ceil(x / e) * e; },
   make() {
@@ -66,18 +67,29 @@ const QUESTS = {
         UI.toast("Quest complete: " + q.text.split(".")[0] + ". Claim it in Quests!", "quest");
       }
     }
-    const side = S.quests.filter(q => q.sp === undefined).length;
-    if (!QUESTS.primed) { QUESTS.primed = true; for (let k = side; k < QUESTS.SLOTS; k++) QUESTS.make(); }   // full board on load
-    else if (side < QUESTS.SLOTS) {
+    const side = S.quests.filter(q => q.sp === undefined).length, slots = QUESTS.SLOTS + ECON.starL(S, "busy");   // Busy Body: more side quests
+    if (!QUESTS.primed) { QUESTS.primed = true; QUESTS.repair(); for (let k = side; k < slots; k++) QUESTS.make(); }   // full board on load
+    else if (side < slots) {
       QUESTS.refillT += dt;
       if (QUESTS.refillT > 25) { QUESTS.refillT = 0; QUESTS.make(); }   // after that, a new odd job every 25 s at most
+    }
+  },
+  /* every story zone you've reached keeps its Special Request until its relic is yours (older saves could lose one,
+     and "pop bubbles" requests couldn't finish while auto-collect was on) */
+  repair() {
+    const S = G.S;
+    for (let k = 0; k <= Math.min(S.zone, ECON.STORY_ZONES - 1); k++) {
+      const zq = ZONES.get(k).quest;
+      if (zq && !S.relics[zq.relic]) { if (S.flags.spDone) delete S.flags.spDone[k]; QUESTS.addSpecial(k); }
+      const ar = ZONES.get(k).relic;   // arrival relics too
+      if (k > 0 && ar && !S.relics[ar]) { S.relics[ar] = 1; const r = DATA.RELICS.find(x => x.id === ar); if (r) UI.toast("Found a relic you missed: " + r.ic + " " + r.name, "zone", 6); }
     }
   },
   rewardText(q) {
     const rw = q.rw, S = G.S;
     if (rw.k === "cash") return "💰 " + U.money(QUESTS.cash());
-    if (rw.k === "socks") return "🧦 " + U.num(rw.v) + " socks";
-    if (rw.k === "mulch") return "🪱 " + U.num(rw.v) + " mulch";
+    if (rw.k === "socks") return "🧦 " + U.num(rw.v * QUESTS.mult()) + " socks";
+    if (rw.k === "mulch") return "🪱 " + U.num(rw.v * QUESTS.mult()) + " mulch";
     const rel = DATA.RELICS.find(r => r.id === rw.relic);
     return (rel ? rel.ic + " " + rel.name : "a relic") + (rw.hat ? " + a hat" : "");
   },
@@ -86,8 +98,8 @@ const QUESTS = {
     if (!q || !q.done) return;
     const rw = q.rw, lines = [];
     if (rw.k === "cash") { const v = QUESTS.cash(); GAME.earn(v); lines.push("💰 " + U.money(v)); }
-    if (rw.k === "socks") { S.soc += rw.v; lines.push("🧦 " + U.num(rw.v) + " socks"); }
-    if (rw.k === "mulch") { S.mu += rw.v; S.tm += rw.v; lines.push("🪱 " + U.num(rw.v) + " mulch"); }
+    if (rw.k === "socks") { const v = rw.v * QUESTS.mult(); S.soc += v; lines.push("🧦 " + U.num(v) + " socks"); }
+    if (rw.k === "mulch") { const v = rw.v * QUESTS.mult(); S.mu += v; S.tm += v; lines.push("🪱 " + U.num(v) + " mulch"); }
     if (rw.k === "relic") {
       const rel = DATA.RELICS.find(r => r.id === rw.relic);
       if (rel && !S.relics[rel.id]) { S.relics[rel.id] = 1; lines.push(rel.ic + " " + rel.name + " (" + rel.desc + ")"); }

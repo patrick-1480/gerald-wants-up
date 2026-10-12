@@ -5,7 +5,7 @@ A desktop (Electron) copy of the web game with Steam built in:
 - **Your Steam account is linked automatically.** Start the game while signed in to Steam and the title screen says
   "Playing as *your name* on Steam"; Settings shows your name, Steam ID and cloud status. (Steam games don't have a
   separate "link account" step: the game uses whoever is signed in to the Steam app.)
-- **26 achievements** (`src/steam.js` → `STEAM.ACH`), with icons in `art/achievements/`.
+- **44 Steam achievements** (`src/steam.js` → `STEAM.ACH`), with icons in `art/achievements/`.
 - **Steam Cloud saves**: the save is uploaded every 2 minutes and when you quit, and on start the newest copy wins
   (this PC, the backup file, or the cloud from another PC).
 - **Rich presence** ("Gerald is at 12,200 ft (THE MOON)" on your friends list), **Steam overlay** (Shift+Tab),
@@ -95,6 +95,24 @@ Gameplay changes go in `../src` (the web version), then `npm run sync`. Steam-on
 | ACH_GOOGOL | Googol Gardener | Earn a googol dollars ($1e100) in total |
 | ACH_HATS | Hat Trick | Collect 10 hats for Gerald |
 | ACH_RELICS | Collector | Find 10 relics |
+| ACH_LAYER_25 | Deep Space | Reach Layer 25 |
+| ACH_LAYER_35 | Way Out There | Reach Layer 35 |
+| ACH_LAYER_50 | Somewhere Near the Top? | Reach Layer 50 |
+| ACH_GOLDEN_SOCK | Midas Sock | Catch a Golden Sock |
+| ACH_SUPER_FRENZY | Bonkers | Start a Super Frenzy |
+| ACH_TRANSPLANT | New Pot | Transplant Gerald to a new planet |
+| ACH_TRANSPLANT_10 | Frequent Flyer | Transplant 10 times |
+| ACH_TRANSPLANT_50 | Planet Collector | Transplant 50 times |
+| ACH_STARDUST | Stargazer | Earn 1,000 Stardust in total |
+| ACH_WEIRD | Weird | Finish a tier of a Weird Run |
+| ACH_WEIRD_ALL | Weirdest of All | Finish all 5 tiers of every Weird Run |
+| ACH_SHINY | Shiny! | Find a shiny plant |
+| ACH_SHINY_ALL | Gotta Grow 'Em All | Find a shiny of every plant species |
+| ACH_PLANTDEX | Plantdex Complete | Find every plant variant |
+| ACH_TROPHIES_50 | Trophy Cabinet | Earn 50 trophies |
+| ACH_TROPHIES_ALL | Every Trophy | Earn every trophy |
+| ACH_LANDMARK | Sightseer | Reach a Cosmic Landmark |
+| ACH_HUNDRED_HOURS | Gerald's Best Friend | Play for 100 hours |
 
 Adding an achievement: add a row to `STEAM.ACH` in `src/steam.js` and to the `ACH` list in `tools/art.html`, make
 its icons with `npm run art`, and add it in Steamworks.

@@ -38,6 +38,7 @@
         <button id="btnUp" class="round" title="Follow Gerald">⬆</button>
         <button id="btnDown" class="round" title="Scroll to the ground">⬇</button>
         <button id="btnMute" class="round" title="Sound on/off">🔊</button>
+        <button id="btnGold" class="round hidden" title="Use a Golden Sock: SUPER FRENZY">🧦<em id="goldN">1</em></button>
       </div>
       <div id="altMeter" title="Altitude"><div id="altTrack"></div></div>
       <div id="ticker"><b>SKY NEWS</b><span id="tickerText"></span></div>
@@ -54,12 +55,14 @@
       <button data-tab="grow" class="on">🌱<span>Garden</span></button>
       <button data-tab="quests" id="tabQuests">📜<span>Quests</span><em id="qBadge"></em></button>
       <button data-tab="compost" id="tabCompost">🪱<span>Compost</span><em id="cBadge"></em></button>
+      <button data-tab="cosmos" id="tabCosmos" class="hidden">🪐<span>Cosmos</span><em id="sBadge"></em></button>
       <button data-tab="stuff">🎒<span>Stuff</span></button>
       <button data-tab="settings">⚙️<span>Settings</span></button>
     </nav>
     <section class="tab on" id="tab-grow"></section>
     <section class="tab" id="tab-quests"></section>
     <section class="tab" id="tab-compost"></section>
+    <section class="tab" id="tab-cosmos"></section>
     <section class="tab" id="tab-stuff"></section>
     <section class="tab" id="tab-settings"></section>
     <div id="sheetGrab" style="display:none"><button id="sheetClose" title="Open / close">▴</button></div>
@@ -88,6 +91,7 @@
 <script src="js/world.js"></script>
 <script src="js/state.js"></script>
 <script src="js/quests.js"></script>
+<script src="js/trophies.js"></script>
 <script src="js/game.js"></script>
 <script src="js/cutscene.js"></script>
 <script src="js/tutorial.js"></script>

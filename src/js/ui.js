@@ -5,7 +5,7 @@ const $ = id => document.getElementById(id);
 const UI = {
   tab: "grow", sig: {}, menuMode: 0,
   init() {
-    UI.buildGrow(); UI.buildCompost(); UI.buildSettings();
+    UI.buildGrow(); UI.buildCompost(); UI.buildCosmos(); UI.buildSettings();
     document.querySelectorAll("#tabs button").forEach(b => (b.onclick = () => UI.setTab(b.dataset.tab, true)));
     $("sheetClose").onclick = () => { UI.sheet(!$("panel").classList.contains("open")); SFX.play("click"); };
     $("panel").addEventListener("click", UI.onAct);
@@ -16,6 +16,7 @@ const UI = {
       G.follow = false; const base = Math.max(0, GAME.mtnTop() - 60);
       G.camTo = G.cam > base + 20 ? base : -90; SFX.play("click");
     };
+    $("btnGold").onclick = () => UI.askSuper();
     $("btnMute").onclick = () => {
       const S = G.S; S.settings.muted = !S.settings.muted; UI.applySound(); SFX.play("click");
     };
@@ -105,6 +106,7 @@ const UI = {
       UI.row("bulk:pa", "Forever Auto-Collect all", "Every plant slot collects by itself, forever", "pink") +
       UI.row("shrine:frenzy", "Sock Shrine: Frenzy", "Offer socks to the sky: 20 seconds of BEAN FRENZY (x7 money)", "pink") +
       UI.row("shrine:gold", "Sock Shrine: Golden Hour", "Offer socks to the sky: every bean is golden for 20 seconds", "gold") +
+      UI.row("gsock:use", "Golden Socks", "Almost never fall. Each one starts a SUPER FRENZY: every frenzy at once, x100 (x" + U.num(ECON.superTotal()) + " money for " + ECON.superDur(G.S) + "s)", "gold") +
       UI.row("sock:super", "Sock Butler", "Whenever you grow a plant, automatically buys its Forever Auto-Collect and Auto-Upgrade (if you have the socks)", "gold") +
       '<button class="btn ghost wide" id="allUp" data-act="allauto" data-id="up"></button>' +
       '<button class="btn ghost wide" id="allCol" data-act="allauto" data-id="col"></button>';
@@ -116,6 +118,9 @@ const UI = {
       '<div class="stats" id="cStats"></div>' +
       '<button class="btn pink big wide" id="compostBtn" data-act="compost"></button>' +
       '<div class="dim" id="cMulch" style="text-align:center"></div>' +
+      '<div class="row hidden" id="autoRow"><div class="m"><b>⏰ Auto-Compost</b><span class="dim" id="autoTxt"></span></div>' +
+      '<button class="btn ghost" id="autoWait" data-act="autow" style="min-width:74px"></button><button class="btn" id="autoOn" data-act="autoc" style="min-width:64px"></button></div>' +
+      '<div class="dim" id="cTease" style="margin-top:6px"></div>' +
       "<h2>Perks (forever)</h2>" + ECON.PERKS.map(d => UI.row("perk:" + d.id, d.name, d.desc, "lil")).join("");
   },
   buildSettings() {
@@ -162,6 +167,7 @@ const UI = {
       case "growmax": GAME.growMax(); break;
       case "sock": GAME.buySock(id); break;
       case "shrine": GAME.shrine(id); break;
+      case "gsock": UI.askSuper(); break;
       case "upall": UI.upgradeAll(); break;
       case "shop": GAME.buyShop(ECON.SHOP.find(d => d.id === id)); break;
       case "perk": GAME.buyPerk(ECON.PERKS.find(d => d.id === id)); break;
@@ -173,6 +179,11 @@ const UI = {
         break;
       }
       case "compost": UI.confirmCompost(); break;
+      case "transplant": UI.confirmTransplant(); break;
+      case "star": GAME.buyStar(ECON.STARS.find(d => d.id === id)); break;
+      case "chal": UI.confirmChal(id); break;
+      case "autoc": S.autoC.on = S.autoC.on ? 0 : 1; SFX.play("click"); break;
+      case "autow": { const W = [30, 60, 120, 300, 600]; S.autoC.wait = W[(W.indexOf(S.autoC.wait) + 1) % W.length]; SFX.play("click"); break; }
       case "claim": QUESTS.claim(+id); break;
       case "hat": if (S.hats[id]) { S.hat = id; SFX.play("click"); UI.sig.stuff = ""; } break;
       case "replay": CINE.play("intro", {}, () => {}); break;
@@ -203,6 +214,12 @@ const UI = {
     }
     if (n) { SFX.play("upgrade", { n }); GAME.refreshPay(); UI.toast("Bought " + n + " upgrades", "grow", 1.6); } else SFX.play("error");
   },
+  askSuper() {
+    const S = G.S;
+    if (!(S.gsock > 0) || GAME.buffs.super > 0) return;
+    UI.modal("<h3>🌟 Use a Golden Sock?</h3><div class='dim'>SUPER FRENZY for <b style='display:inline;color:var(--gold)'>" + ECON.superDur(S) + " seconds</b>: Bean Frenzy, Spit Frenzy and Golden Hour all at once, times 100. That's <b style='display:inline;color:var(--gold)'>x" + U.num(ECON.superTotal()) + "</b> money. You have " + U.num(S.gsock) + ". They almost never fall.</div>",
+      [["Save it", null, "ghost"], ["SUPER FRENZY!", () => { GAME.superFrenzy(); }, "gold"]]);
+  },
   confirmCompost() {
     const S = G.S, g = ECON.mulchGain(S);
     if (g < 1) return;
@@ -210,6 +227,61 @@ const UI = {
     if (!S.flags.composted) go();
     else UI.modal("<h3>Compost?</h3><div class='dim'>Wormsley eats all " + S.n + " plants. You get <b style='color:var(--gold)'>+" + U.num(g) + " mulch</b> and the mountain grows <b style='color:var(--gold)'>" + U.ft(ECON.mtnGain(S)) + "</b>. Money, plant levels and the Sky Shop reset.</div>",
       [["Not yet", null, "ghost"], ["Feed the worm", go, "pink"]]);
+  },
+
+  /* ---------- Cosmos: Transplanting, the Star Chart and Weird Runs ---------- */
+  buildCosmos() {
+    $("tab-cosmos").innerHTML =
+      '<div class="objCard cosmos"><div class="big" id="cPlanet"></div><div class="dust" id="cDust"></div>' +
+      '<div class="dim" style="color:var(--cream);margin:6px 0">Transplanting moves Gerald to a new pot on a new planet. This planet resets (money, plants, mulch, perks, the mountain, zones). ' +
+      'You keep relics, hats, socks, sock automation, Golden Socks, the Plantdex, trophies and everything in this tab. Stardust grows 10x for every 12 powers of ten of money you earn on a planet.</div>' +
+      '<button class="btn gold big wide" id="tpBtn" data-act="transplant"></button><div class="dim" id="tpInfo" style="text-align:center"></div></div>' +
+      "<h2>Star Chart</h2><div class='dim' style='margin-bottom:6px'>Bought with Stardust. Kept forever. Some never stop growing.</div>" +
+      ECON.STARS.map(d => UI.row("star:" + d.id, d.ic + " " + d.name, d.desc, "gold").replace('class="row"', 'class="row star"')).join("") +
+      '<div id="chalBox"></div>';
+  },
+  updCosmos() {
+    const S = G.S, g = ECON.dustGain(S);
+    UI.set("cPlanet", "🪐 Planet " + (S.planet + 1) + ": " + ECON.planetName(S.planet) + (S.chal ? " · 🌀 " + ECON.CHALS.find(c => c.id === S.chal).name : ""));
+    UI.set("cDust", "⭐ " + U.num(S.dust) + " Stardust" + (S.dustEver > S.dust ? "  (" + U.num(S.dustEver) + " ever)" : ""));
+    UI.set("tpBtn", g >= 1 ? "Transplant: +" + U.num(g) + " ⭐" : "Earn more money on this planet first", g < 1, "btn gold big wide" + (g >= Math.max(1, S.dustEver * 0.5) ? " glow" : ""));
+    const L = S.tEarnL || -1, next = L < ECON.DUST0 ? ECON.DUST0 : ECON.DUST0 + ECON.DUST_STEP * (Math.floor((L - ECON.DUST0) / ECON.DUST_STEP) + 1);
+    UI.set("tpInfo", "Earned on this planet: $" + (L < 0 ? "0" : U.fmtLog(L)) + " · Stardust x10 at $" + U.fmtLog(next));
+    for (const d of ECON.STARS) {
+      const l = ECON.starL(S, d.id), mx = d.max && l >= d.max, c = ECON.starCost(d, l);
+      UI.set("l_star:" + d.id, d.max === 1 ? (l ? "owned" : "") : d.max ? l + "/" + d.max : l ? "Lv " + l : "");
+      UI.set("b_star:" + d.id, mx ? (d.max === 1 ? "Owned ✓" : "MAX") : U.num(c) + " ⭐", mx || S.dust < c);
+    }
+    UI.updChal();
+  },
+  updChal() {
+    const S = G.S, box = $("chalBox"), open = ECON.starL(S, "weird") > 0, sig = open + "|" + S.chal + "|" + JSON.stringify(S.chalT);
+    if (UI.sig.chal === sig) return;
+    UI.sig.chal = sig;
+    box.innerHTML = !open ? "<h2>Weird Runs 🔒</h2><div class='dim'>Buy <b style='display:inline'>Weird Runs</b> on the Star Chart: challenge planets with odd rules and permanent rewards.</div>" :
+      "<h2>Weird Runs</h2><div class='dim' style='margin-bottom:6px'>Starting one Transplants you (you still get your Stardust) onto a planet with an odd rule. Reach " +
+      ECON.CHAL_GOALS.map(z => ZONES.get(z).short).join(", ") + " for tiers 1-5. Rewards are forever. Leave any time (that's another Transplant).</div>" +
+      ECON.CHALS.map(c => {
+        const t = ECON.chalT(S, c.id), on = S.chal === c.id;
+        return '<div class="row chal' + (on ? " on" : "") + '"><div class="m"><b>' + c.ic + " " + c.name + ' <span class="pips">' + "★".repeat(t) + "<i>" + "★".repeat(5 - t) + "</i></span></b>" +
+          '<span class="dim">' + c.rule + " <b style='display:inline;color:var(--gold)'>Reward: " + c.rw + "</b></span></div>" +
+          '<button class="btn ' + (on ? "ghost" : "pink") + '" data-act="chal" data-id="' + c.id + '"' + (S.chal && !on ? " disabled" : "") + ">" + (on ? "Leave" : t >= 5 ? "Done ✓" : "Start") + "</button></div>";
+      }).join("");
+  },
+  confirmTransplant() {
+    const S = G.S, g = ECON.dustGain(S);
+    if (g < 1) return;
+    UI.modal("<h3>🪐 Transplant?</h3><div class='dim'>Gerald moves to <b style='display:inline;color:var(--gold)'>" + ECON.planetName(S.planet + 1) + "</b> and you get <b style='display:inline;color:var(--gold)'>+" + U.num(g) + " Stardust</b>. " +
+      "This planet resets: money, plants, mulch, perks, the mountain and zones" + (ECON.starL(S, "bedrock") ? " (Bedrock keeps " + Math.round(ECON.bedrock(S) * 100) + "% of the mountain)" : "") + ". Relics, hats, socks, Golden Socks, the Plantdex and trophies stay.</div>",
+      [["Not yet", null, "ghost"], ["Pack the pot!", () => GAME.transplant(null), "gold"]]);
+  },
+  confirmChal(id) {
+    const S = G.S, c = ECON.CHALS.find(x => x.id === id), g = ECON.dustGain(S);
+    if (S.chal === id) UI.modal("<h3>Leave " + c.name + "?</h3><div class='dim'>That's a Transplant back to normal soil" + (g >= 1 ? " (+" + U.num(g) + " Stardust)" : "") + ". Tiers you finished are kept.</div>",
+      [["Keep going", null, "ghost"], ["Leave the run", () => GAME.transplant(null), "pink"]]);
+    else UI.modal("<h3>" + c.ic + " Start " + c.name + "?</h3><div class='dim'><b style='display:inline;color:var(--cream)'>Rule:</b> " + c.rule + "<br><b style='display:inline;color:var(--gold)'>Reward per tier:</b> " + c.rw +
+      ".<br>This Transplants you now" + (g >= 1 ? " (+" + U.num(g) + " Stardust)" : "") + " onto a bare challenge planet (no Bedrock).</div>",
+      [["Not now", null, "ghost"], ["Start the run", () => GAME.transplant(id), "pink"]]);
   },
 
   /* ---------- per-tick refresh ---------- */
@@ -225,8 +297,11 @@ const UI = {
     if (GAME.buffs.frenzy > 0) bf.push((sm ? "🔥 x7 " : "🔥 BEAN FRENZY x7 · ") + Math.ceil(GAME.buffs.frenzy) + "s");
     if (GAME.buffs.spit > 0) bf.push((sm ? "💨 x4 " : "💨 SPIT FRENZY x4 · ") + Math.ceil(GAME.buffs.spit) + "s");
     if (GAME.buffs.gold > 0) bf.push((sm ? "✨ gold " : "✨ GOLDEN HOUR · ") + Math.ceil(GAME.buffs.gold) + "s");
+    if (GAME.buffs.super > 0) bf.unshift("*" + (sm ? "🌟 x" + U.num(ECON.superTotal()) + " " : "🌟 SUPER FRENZY x" + U.num(ECON.superTotal()) + " · ") + Math.ceil(GAME.buffs.super) + "s");
     const bs = bf.join("|");
-    if (UI.sig.buffs !== bs) { UI.sig.buffs = bs; $("hudBuffs").innerHTML = bf.map(b => '<span class="buff">' + b + "</span>").join(""); }
+    if (UI.sig.buffs !== bs) { UI.sig.buffs = bs; $("hudBuffs").innerHTML = bf.map(b => b[0] === "*" ? '<span class="buff super">' + b.slice(1) + "</span>" : '<span class="buff">' + b + "</span>").join(""); }
+    $("btnGold").classList.toggle("hidden", !(S.gsock > 0) || GAME.buffs.super > 0);
+    UI.set("goldN", S.gsock > 1 ? U.num(S.gsock) : "");
     UI.objective();
     UI.altMeter();
     UI.layoutHud();
@@ -239,6 +314,13 @@ const UI = {
     else if (UI.tab === "quests") UI.updQuests();
     else if (UI.tab === "compost") UI.updCompost();
     else if (UI.tab === "stuff") UI.updStuff();
+    else if (UI.tab === "cosmos") UI.updCosmos();
+    // the Cosmos tab appears once Gerald has reached the Fourth Wall
+    const cOpen = ECON.transplantOpen(S);
+    $("tabCosmos").classList.toggle("hidden", !cOpen);
+    if (cOpen && !S.flags.cosmosHint && G.started && !CINE.active) { S.flags.cosmosHint = 1; UI.hint("cosmos", "Gerald reached the Fourth Wall, so a new tab opened: COSMOS. Transplant him to a new planet for Stardust, which buys permanent upgrades. He starts over, but much faster. Trust the worm.", true); }
+    const canStar = cOpen && ECON.STARS.some(d => (!d.max || ECON.starL(S, d.id) < d.max) && S.dust >= ECON.starCost(d, ECON.starL(S, d.id)));
+    UI.set("sBadge", canStar ? "!" : "", undefined, canStar ? "on" : "");
     UI.updMenu();
   },
   /* the top HUD cards can never overlap: the goal card sits between the money card and the round buttons when
@@ -310,6 +392,8 @@ const UI = {
     UI.set("cheapBtn", ci < 0 ? "All plants maxed" : "Best upgrade · " + U.money(cc), ci < 0 || S.m < cc);
     UI.set("growMaxBtn", undefined, S.m < c);
     UI.set("b_sock:super", S.sockAuto ? "Hired ✓" : U.num(ECON.SUPER_SOCK) + " 🧦", !!S.sockAuto || S.soc < ECON.SUPER_SOCK);
+    UI.set("l_gsock:use", S.gsock > 0 ? "x" + U.num(S.gsock) : "");
+    UI.set("b_gsock:use", GAME.buffs.super > 0 ? "Frenzying! " + Math.ceil(GAME.buffs.super) + "s" : S.gsock > 0 ? "Use one!" : "None yet", !(S.gsock > 0) || GAME.buffs.super > 0);
     for (const k of ["frenzy", "gold"]) { const c = ECON.shrine(S, k); UI.set("b_shrine:" + k, U.num(c) + " 🧦", S.soc < c); }
     UI.set("l_sock:super", S.sockAuto ? "on" : "");
     UI.set("allBtn", undefined, S.m < cc);
@@ -394,7 +478,16 @@ const UI = {
     if (UI.sig.cst !== h) { UI.sig.cst = h; $("cStats").innerHTML = h; }
     UI.set("compostBtn", g >= 1 ? "Feed the worm: +" + U.num(g) + " mulch" : "Grow " + Math.max(0, ECON.compostNeed(S) - S.n) + " more plants first", g < 1,
       "btn pink big wide" + (g >= 1 ? " glow" : ""));
-    UI.set("cMulch", U.num(S.mu) + " mulch to spend · " + U.num(S.tm) + " made ever (+" + U.num(S.tm * 10) + "% payouts)");
+    UI.set("cMulch", U.num(S.mu) + " mulch to spend · " + U.num(S.tm) + " made on this planet (+" + U.num(S.tm * 10) + "% payouts)");
+    const hasT = ECON.starL(S, "timer") > 0, w = S.autoC.wait;
+    $("autoRow").classList.toggle("hidden", !hasT);
+    if (hasT) {
+      UI.set("autoTxt", "Composts by itself once no new plant has grown for " + (w < 60 ? w + " s" : w / 60 + " min") + " (and Wormsley is hungry)");
+      UI.set("autoWait", w < 60 ? w + "s" : w / 60 + "m");
+      UI.set("autoOn", S.autoC.on ? "ON" : "OFF", false, "btn " + (S.autoC.on ? "green" : "ghost"));
+    }
+    UI.set("cTease", ECON.transplantOpen(S) ? (S.chal === "nomulch" ? "🥗 Wormsley's Diet: composting only gives 1 mulch and perks do nothing this run." : "")
+      : "🪐 Something even bigger than composting is waiting at the Fourth Wall.");
     for (const d of ECON.PERKS) {
       const l = ECON.perkL(S, d.id), mx = l >= d.max, cost = ECON.cost(d, l);
       UI.set("l_perk:" + d.id, d.max > 1 ? l + "/" + d.max : l ? "owned" : "");
@@ -402,7 +495,7 @@ const UI = {
     }
   },
   updStuff() {
-    const S = G.S, sig = Object.keys(S.relics).length + "|" + S.trinkets.length + "|" + Object.keys(S.hats).length + "|" + S.hat;
+    const S = G.S, sig = Object.keys(S.relics).length + "|" + S.trinkets.length + "|" + Object.keys(S.hats).length + "|" + S.hat + "|" + ECON.dexCount(S) + "|" + ECON.shinyCount(S) + "|" + ECON.trophyCount(S) + "|" + (S.marks || 0);
     if (UI.sig.stuff !== sig) {
       UI.sig.stuff = sig;
       const nr = DATA.RELICS.filter(r => S.relics[r.id]).length;
@@ -415,6 +508,21 @@ const UI = {
       h += "<h2>Hats</h2><div class='dim' style='margin-bottom:6px'>Purely for fashion. Gerald insists.</div><div class='grid' id='hatGrid'>" +
         DATA.HATS.map(hh => '<button class="hatBtn' + (S.hat === hh.id ? " on" : "") + '" data-act="hat" data-id="' + hh.id + '"' + (S.hats[hh.id] ? "" : " disabled") +
           ' title="' + (S.hats[hh.id] ? hh.name : "???") + '"><canvas width="112" height="112" data-hat="' + hh.id + '"></canvas>' + (S.hats[hh.id] ? hh.name : "???") + "</button>").join("") + "</div>";
+      // Trophies
+      if (!TROPHY.LIST.length) TROPHY.build();
+      const nt = ECON.trophyCount(S);
+      h += "<h2>Trophies " + nt + "/" + TROPHY.LIST.length + "</h2><div class='dim' style='margin-bottom:6px'>Each one: all payouts x1.02 forever (now x" + U.num(1.02 ** nt) + "). Tap one to see what it's for.</div><div class='trGrid'>" +
+        TROPHY.LIST.map(t => '<div class="tr' + (S.troph[t.id] ? "" : " no") + '" data-tr="' + t.id + '" title="' + t.name + ": " + t.desc + '">' + t.ic + "</div>").join("") +
+        '</div><div class="dim" id="trInfo" style="margin-top:6px;min-height:20px"></div>';
+      // Plantdex
+      const dexAll = TROPHY.DEX_ALL();
+      h += "<h2>Plantdex " + ECON.dexCount(S) + "/" + dexAll + " · ✨ " + ECON.shinyCount(S) + "/" + DATA.SPECIES.length + "</h2><div class='dim' style='margin-bottom:6px'>Every species and accessory you grow (+0.5% payouts each). " +
+        "Shiny plants are very rare (about 1 in " + Math.round(1 / ECON.shinyChance(S)) + " sprouts): the first shiny of each species makes all payouts x1.25 forever.</div><div class='dexGrid'>" +
+        DATA.SPECIES.map(sp => {
+          const n = Object.keys(S.dex.seen).filter(k => k.split("|")[0] === sp.t).length, sh = S.dex.shiny[sp.t];
+          return '<div class="dexCard' + (sh ? " shiny" : "") + (n ? "" : " no") + '"><canvas width="128" height="128" data-sp="' + sp.t + '"></canvas>' + (n ? sp.nouns[0] : "???") + "<br>" + n + "/10" + (sh ? " ✨" : "") + "</div>";
+        }).join("") + "</div>";
+      if (S.marks) h += "<h2>Cosmic Landmarks " + S.marks + "</h2><div class='dim'>" + Array.from({ length: S.marks }, (_, k) => "🗿 " + DATA.landmark(k + 1)).join(" · ") + " (all payouts x2 each)</div>";
       h += "<h2>Stats</h2><div class='stats' id='statGrid'></div>";
       $("tab-stuff").innerHTML = h;
       $("tab-stuff").querySelectorAll("canvas[data-hat]").forEach(c => {
@@ -424,6 +532,16 @@ const UI = {
         else { x.font = "40px " + INK.FONT; x.textAlign = "center"; x.fillStyle = "#cdb8ee"; x.fillText("?", 0, 14); }
         x.restore();
       });
+      $("tab-stuff").querySelectorAll("canvas[data-sp]").forEach((c, k) => {
+        const x = c.getContext("2d"), sp = c.dataset.sp, hue = (k * 53 + 20) % 360;
+        const info = { i: k, name: sp, type: sp, hue, c1: INK.hsl(hue, 72, 66), c2: INK.hsl((hue + 160) % 360, 75, 60), eyes: 2, eyeStyle: "round", mouth: "smile", acc: "none", pt: 6, seed: 7 + k * 13 };
+        x.save(); x.translate(64, 70); x.scale(1.05, 1.05);
+        GAME.safe("dexplant", () => DRAW.plant(x, info, { t: 0, grow: 1, look: { x: 0, y: 0.2 }, dir: 1 }));
+        x.restore();
+      });
+      $("tab-stuff").querySelectorAll(".tr[data-tr]").forEach(e => (e.onmouseenter = e.onclick = () => {
+        const t = TROPHY.LIST.find(x => x.id === e.dataset.tr); UI.set("trInfo", t.ic + " " + t.name + ": " + t.desc + (S.troph[t.id] ? " ✓" : ""));
+      }));
       $("tab-stuff").querySelectorAll(".relic[data-id]").forEach(e => (e.onmouseenter = e.onclick = () => {
         const r = DATA.RELICS.find(x => x.id === e.dataset.id); UI.set("relicInfo", r.ic + " " + r.name + ": " + r.desc);
       }));
@@ -431,7 +549,9 @@ const UI = {
     const st = S.stats, rows = [["Time played", U.time(st.time)], ["Money earned ever", st.earnL < 0 ? "$0" : "$" + U.fmtLog(st.earnL)],
       ["Record altitude", U.ft(S.rec)], ["Zones reached", S.zone + 1], ["Beans spat", U.num(st.beans)], ["Golden beans", U.num(st.golden)],
       ["Gerald poked", U.num(st.pokes)], ["Socks caught", U.num(st.socks)], ["Bubbles popped", U.num(st.bubbles)], ["Upgrades bought", U.num(st.upgrades)],
-      ["Plants sprouted", U.num(st.sprouts)], ["Visitors befriended", U.num(st.visitors)], ["Times composted", U.num(st.composts)], ["Quests done", U.num(st.quests)]];
+      ["Plants sprouted", U.num(st.sprouts)], ["Visitors befriended", U.num(st.visitors)], ["Times composted", U.num(st.composts)], ["Quests done", U.num(st.quests)],
+      ["Golden socks caught", U.num(st.gsocks || 0)], ["Super frenzies", U.num(st.superF || 0)],
+      ["Transplants", U.num(st.transplants || 0)], ["Best zone ever", S.best.zone + 1], ["Shiny plants found", U.num(st.shinies || 0)]];
     const h = rows.map(r => "<span>" + r[0] + "</span><span>" + r[1] + "</span>").join("");
     if (UI.sig.stats !== h && $("statGrid")) { UI.sig.stats = h; $("statGrid").innerHTML = h; }
   },

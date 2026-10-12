@@ -1224,6 +1224,27 @@ const CINE = {
       return steps;
     },
     reward(p) { return [{ shot: "reward", bars: false, lock: 0.5 }]; },
+    /* the first Transplant: Wormsley has a new pot, on a new planet. It looks suspiciously like the old garden. */
+    transplant(p) {
+      p.zone = Object.assign({}, ZONES.get(14), { who: "worm" });
+      const planet = p.planet || "a new planet", dust = typeof p.dust === "number" ? U.num(p.dust) : "some";
+      return [
+        { shot: "ztalk", mood: "grump", say: ["worm", "Ahem. Wormsley. I also do pots."] },
+        { say: ["worm", "You've gone up a very long way. The old pot is tired. Frankly, so is the planet."] },
+        { mood: "shock", say: ["gerald", "I am not tired. I am FURIOUS. Completely different thing."] },
+        { say: ["worm", "There's a new pot. On " + planet + ". You'd start small again."] },
+        { say: ["worm", "But the stars remember everything you did. " + dust + " Stardust's worth. Spend it on the Star Chart."] },
+        { say: ["gerald", "Does the new planet have a Moon?"] },
+        { say: ["worm", "It has several. They all look at you funny."] },
+        { mood: "happy", shake: 7, say: ["gerald", "...PACK THE POT."] },
+        { shot: "garden", cam: "wide", rate: 0.9, wait: 1.0 },
+        { cam: "bean", mark: "beanT", say: ["narr", "Far away, a bean landed in an empty pot."] },
+        { cam: "sprout", mark: "sproutT", sfx: "grow", shake: 7, wait: 2.4 },
+        { cam: "gerald", mark: "wakeT", say: ["gerald", "...This looks exactly like the old garden."] },
+        { cam: "gnome", mark: "gnomeLookT", say: ["narr", "Gnome Dave is already here. Nobody knows how. Nobody asks."] },
+        { cam: "gerald", mood: "shock", shake: 5, say: ["gerald", "UP. AGAIN. FASTER."] },
+      ];
+    },
   },
   _compost(p, short) {
     const n = CINE._plants(p.plants).length;

@@ -42,16 +42,21 @@ function appIcon(N) {
   x.restore();
   return c;
 }
-/* achievement icons: keep in step with STEAM.ACH in app/js/steam.js */
+/* achievement icons: keep in step with STEAM.ACH in src/steam.js */
 const ACH = [["ACH_FIRST_SPROUT","sprouts"],["ACH_RUDE","pokes"],["ACH_CLOUDS","tall"],["ACH_PARLIAMENT","tall"],["ACH_ATTIC","tall"],["ACH_MOON","moon"],
   ["ACH_LAUNDROMAT","socks"],["ACH_SUN","tall"],["ACH_FOURTH_WALL","tall"],["ACH_ENDLESS","tall"],["ACH_LAYER_10","tall"],["ACH_COMPOST","compost"],
   ["ACH_COMPOST_10","compost"],["ACH_COMPOST_50","compost"],["ACH_SOCKS_100","socks"],["ACH_SOCKS_1000","socks"],["ACH_BUTLER","socks"],["ACH_VISITORS","visitors"],
-  ["ACH_GOLDEN","golden"],["ACH_QUESTS","unknown"],["ACH_UPGRADES","upgrades"],["ACH_PLANTS_50","level"],["ACH_MILLION","earn"],["ACH_GOOGOL","earn"],["ACH_HATS","hat"],["ACH_RELICS","bubbles"]];
+  ["ACH_GOLDEN","golden"],["ACH_QUESTS","unknown"],["ACH_UPGRADES","upgrades"],["ACH_PLANTS_50","level"],["ACH_MILLION","earn"],["ACH_GOOGOL","earn"],["ACH_HATS","hat"],["ACH_RELICS","bubbles"],
+  ["ACH_LAYER_25","tall"],["ACH_LAYER_35","tall"],["ACH_LAYER_50","tall"],["ACH_GOLDEN_SOCK","gsock"],["ACH_SUPER_FRENZY","gsock"],["ACH_TRANSPLANT","planet"],
+  ["ACH_TRANSPLANT_10","planet"],["ACH_TRANSPLANT_50","planet"],["ACH_STARDUST","star"],["ACH_WEIRD","weird"],["ACH_WEIRD_ALL","weird"],["ACH_SHINY","shiny"],
+  ["ACH_SHINY_ALL","shiny"],["ACH_PLANTDEX","dex"],["ACH_TROPHIES_50","trophy"],["ACH_TROPHIES_ALL","trophy"],["ACH_LANDMARK","landmark"],["ACH_HUNDRED_HOURS","time"]];
+const EMO = { gsock: "🧦", planet: "🪐", star: "⭐", weird: "🌀", shiny: "💎", dex: "📗", trophy: "🏆", landmark: "🗿", time: "⏳" };
 function achIcon(type, grey) {
   const c = document.createElement("canvas"); c.width = c.height = 64; const x = c.getContext("2d");
   x.fillStyle = grey ? "#3b3546" : "#4a2a6c"; x.fillRect(0, 0, 64, 64);
   x.save(); x.translate(32, 32); if (grey) x.filter = "grayscale(1) brightness(.75)";
-  if (type === "moon") { x.strokeStyle = INK.C.ink; x.lineWidth = 2.5; DRAW.moonFace(x, 24, { t: 1, mood: "smug", look: { x: -0.5, y: 0.5 } }); }
+  if (EMO[type]) { x.font = "38px 'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji',sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(EMO[type], 0, 2); }
+  else if (type === "moon") { x.strokeStyle = INK.C.ink; x.lineWidth = 2.5; DRAW.moonFace(x, 24, { t: 1, mood: "smug", look: { x: -0.5, y: 0.5 } }); }
   else if (type === "hat") { x.scale(0.55, 0.55); x.translate(0, 18); DRAW.gerald(x, { t: 1, spit: 0, look: { x: 0.4, y: -0.2 }, hat: "tophat", mood: "grump", blink: 0, neck: false }); }
   else { x.scale(1.2, 1.2); DRAW.questIcon(x, type, 50, 1); }
   x.restore();

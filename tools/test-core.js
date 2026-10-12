@@ -6,13 +6,13 @@ var document = { getElementById: () => null };
 var localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 var SFX = { play() {}, music() {}, init() {}, setVolume() {}, setMusicOn() {}, duck() {} };
 var matchMedia = () => ({ matches: false });
-var UI = { toast() {}, hint() {}, bump() {}, refreshAll() {}, refreshMenu() {} };
+var UI = { toast() {}, hint() {}, bump() {}, refreshAll() {}, refreshMenu() {}, sig: {} };
 var CINE = { active: false, log: [], play(id, p, cb) { if (p && p.zone) this.log.push(p.zone.k + '@' + (G.T / 60).toFixed(0) + 'm'); cb && cb(); } };
 var TUT = { active: false };
 var DRAW = {}, WORLD = {};
 var G = { S: STATE.fresh(), T: 0, W: 900, H: 700, vW: 900, vH: 700, zoom: 1, cam: 0, mouse: { x: 0, y: 0, in: false }, follow: true };
 `);
-for (const f of ['quests', 'game']) c.run(require('fs').readFileSync(__dirname + '/../src/js/' + f + '.js', 'utf8').replace(/^const ([A-Z_]+) =/gm, 'var $1 ='));
+for (const f of ['quests', 'trophies', 'game']) c.run(require('fs').readFileSync(__dirname + '/../src/js/' + f + '.js', 'utf8').replace(/^const ([A-Z_]+) =/gm, 'var $1 ='));
 c.run(`
 const S = G.S; S.flags.tut = 1; GAME.refreshPay();
 let t = 0, lastGrow = 0, dt = 0.05, log = [];
@@ -41,4 +41,18 @@ console.log(log.slice(0, 12).join(' | '));
 console.log('relics', Object.keys(S.relics).join(','), '| hats', Object.keys(S.hats).join(','));
 console.log('active quests', S.quests.map(q => q.t + ':' + Math.floor(QUESTS.progress(q)) + '/' + q.n + (q.sp !== undefined ? '(sp' + q.sp + ')' : '')).join(' '));
 console.log('beans in flight', GAME.beans.length, 'stats', JSON.stringify(S.stats));
+// expansion smoke test: trophies, Transplant, a Weird Run, the Star Chart
+G.started = true; TROPHY.check();
+console.log('trophies', ECON.trophyCount(S), '/', TROPHY.LIST.length, '| dex', ECON.dexCount(S), '| shinies', ECON.shinyCount(S));
+S.best.zone = Math.max(S.best.zone, 14); S.tEarnL = 60;
+const d0 = ECON.dustGain(S); GAME.transplant(null);
+console.log('transplant: +' + d0 + ' dust -> planet', S.planet, ECON.planetName(S.planet), '| zone', S.zone, '| n', S.n, '| mtn', S.mtn, '| dust', S.dust);
+S.dust = 1e6; for (const d of ECON.STARS) for (let k = 0; k < 3; k++) GAME.buyStar(d);
+console.log('stars', JSON.stringify(S.star), '| headStart', ECON.headStart(S), '| cap0', ECON.cap(S, 0));
+GAME.transplant('tiny');
+for (let k = 0; k < 40; k++) { S.m = 1e300; GAME.grow(true); }
+console.log('tiny pot: n', S.n, '(max ' + ECON.TINY_MAX + ') | chal', S.chal);
+S.mtn = ECON.zoneAt(6); for (let k = 0; k < 20; k++) GAME.step(0.05);
+console.log('tiny tiers', ECON.chalT(S, 'tiny'), '| zone', S.zone);
+GAME.transplant(null); console.log('left run: chal', S.chal, '| planet', S.planet, '| pay x2 per tier ->', Math.round(Math.exp(ECON.lnStar(S))));
 `);

@@ -2,7 +2,7 @@
 const STATE = {
   KEY: "gwu4", BACKUP: "gwu4b", OLD: "gwu3",
   // numbers that matter for cheating are kept scrambled in memory (GUARD.protect)
-  SAFE: ["m", "run", "u", "soc", "mu", "tm", "mtn", "n", "zone", "rec", "cc"],
+  SAFE: ["m", "run", "u", "soc", "mu", "tm", "mtn", "n", "zone", "rec", "cc", "gsock", "gsockT", "superT", "dust", "dustEver", "planet", "marks"],
   /* saves (and export codes) from before saves were sealed are converted once, from the old save slot only;
      release builds made after this date stop accepting them (otherwise anyone could hand-write an unsealed save) */
   legacyOK: () => typeof BUILD_TIME === "undefined" || BUILD_TIME < Date.UTC(2026, 10, 1),
@@ -13,12 +13,16 @@ const STATE = {
       m: 0, run: 0, n: 1, lv: {}, bk: { 0: 50 }, ac: {}, shop: {}, runT: 0,   // first plant starts with a $50 bubble for the tutorial
       // permanent
       soc: 0, mu: 0, tm: 0, perk: {}, mtn: 0, strata: [], cc: 0, zone: 0, rec: 1, lastMulch: 0,
+      gsock: 0, gsockT: 0, superT: 0,   // golden socks owned, active seconds since the last one, Super Frenzy left
       caps: {},   // per plant slot: how many composts it has survived (level cap = 10 + 5 each)
       ua: {}, uo: {}, pa: {}, co: {}, sbOff: 0, mx: 0,   // uo / co: auto-upgrade / auto-collect switched off per slot
       relics: {}, trinkets: [], hats: { none: 1 }, hat: "none",
+      // Transplanting (2nd reset): Stardust + Star Chart, planets, Weird Runs (challenges), collections
+      star: {}, dust: 0, dustEver: 0, tEarnL: -1, planet: 0, best: { zone: 0, n: 0 }, marks: 0,
+      chal: null, chalT: {}, dex: { seen: {}, shiny: {} }, troph: {}, autoC: { on: 0, wait: 120 },
       quests: [], qDone: 0, qSeq: 0,
       stats: { earnL: -1, beans: 0, golden: 0, socks: 0, bubbles: 0, upgrades: 0, sprouts: 0, visitors: 0,
-        pokes: 0, composts: 0, time: 0, quests: 0 },
+        pokes: 0, composts: 0, time: 0, quests: 0, gsocks: 0, superF: 0, transplants: 0, shinies: 0 },
       flags: { intro: 0, tut: 0, tutStep: 0, moonGone: 0, finale: 0, hints: {} },
       settings: { sfx: 0.7, mus: 0.4, shake: true, chatter: true, sci: false, cine: "all", music: true, metric: false },
       last: Date.now(), srvT: 0,   // srvT: server time of the last save (offline rewards are measured from it)
@@ -83,6 +87,13 @@ const STATE = {
     if (S.go) { for (const k in S.ua) S.uo[k] = 1; S.sbOff = 1; }   // old global pause -> every plant switched off
     delete S.go;
     if (S.lastN === undefined) S.lastN = S.cc ? Math.max(ECON.MIN_COMPOST, ...S.strata.map(st => st.n || 0)) : 0;
+    // saves from before Transplanting: everything earned so far counts toward the first one
+    S.best = Object.assign({ zone: 0, n: 0 }, S.best || {});
+    S.best.zone = Math.max(S.best.zone, S.zone || 0); S.best.n = Math.max(S.best.n, S.n || 0);
+    if (!(S.tEarnL > -1) && !S.stats.transplants) S.tEarnL = S.stats.earnL;
+    S.dex = Object.assign({ seen: {}, shiny: {} }, S.dex || {});
+    S.autoC = Object.assign({ on: 0, wait: 120 }, S.autoC || {});
+    S.star = S.star || {}; S.chalT = S.chalT || {}; S.troph = S.troph || {};
   },
   saveN: 0,
   save(S) {
@@ -106,8 +117,9 @@ const STATE = {
   /* add x money units to the all-time earned counter (kept as log10 so it never overflows) */
   addEarned(S, x) {
     if (!(x > 0)) return;
-    const b = Math.log10(x) + S.u, a = S.stats.earnL;
-    S.stats.earnL = a < 0 ? b : Math.max(a, b) + Math.log10(1 + 10 ** (Math.min(a, b) - Math.max(a, b)));
+    const b = Math.log10(x) + S.u, add = a => (a < 0 ? b : Math.max(a, b) + Math.log10(1 + 10 ** (Math.min(a, b) - Math.max(a, b))));
+    S.stats.earnL = add(S.stats.earnL);
+    S.tEarnL = add(S.tEarnL === undefined ? -1 : S.tEarnL);      // since the last Transplant (Stardust is based on it)
   },
   /* redenominate when amounts get astronomically large (see econ.js) */
   shift(S) {

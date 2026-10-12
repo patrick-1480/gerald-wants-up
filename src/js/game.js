@@ -3,7 +3,7 @@
 const GAME = {
   beans: [], socks: [], visitors: [], parts: [], floats: [], says: [],
   sp: {}, wob: {}, payC: [], payT: 0, sel: -1,
-  buffs: { frenzy: 0, spit: 0, gold: 0 },
+  buffs: { frenzy: 0, spit: 0, gold: 0, super: 0 }, autoPop: {},
   tm: { seed: 0, sock: 6, visit: 45, auto: 0, intern: 0, chat: 6, gerald: 14, poke: 0 },
   spitAnim: 0, geraldMood: "grump", moodT: 0, gSay: null, ipsM: 0, lastRun: 0, ipsT: 0,
   zoneQueue: [], musicZone: -1,
@@ -65,16 +65,35 @@ const GAME = {
       acc: r() < 0.5 ? "none" : U.pick(["tophat", "bow", "glasses", "monocle", "mustache", "unibrow", "flower", "bandaid", "earring"], r),
       pt: 5 + Math.floor(r() * 5), seed: Math.floor(r() * 1e6),
       fact: fk[0] + ": " + U.pick(fk[1], r),
+      roll: U.rng(S.sd * 7 + cc * 31337 + i * 104729 + 99)(),   // shiny if below ECON.shinyChance
     });
   },
 
+  isShiny: i => GAME.plantInfo(i).roll < ECON.shinyChance(G.S),
+  /* Plantdex: every species + accessory combo you grow, and the first shiny of each species */
+  recordDex(i, quiet) {
+    const S = G.S, p = GAME.plantInfo(i), key = p.type + "|" + p.acc;
+    if (!S.dex.seen[key]) { S.dex.seen[key] = 1; if (!quiet) UI.sig.stuff = ""; }
+    if (!GAME.isShiny(i)) return;
+    if (!S.dex.shiny[p.type]) {
+      S.dex.shiny[p.type] = 1; S.stats.shinies++;
+      if (!quiet) {
+        UI.toast("✨ SHINY " + p.name + "! New in your Plantdex: all payouts x1.25 forever", "gold", 6);
+        SFX.play("golden"); SFX.play("claim"); UI.sig.stuff = "";
+      }
+    } else if (!quiet) UI.toast("✨ A shiny " + p.name + "! (it pays x3)", "gold", 4);
+    if (!quiet) { const sx = GAME.plantSX(i) * G.zoom, sy = GAME.toY(GAME.plantWY(i)) * G.zoom; GAME.burst(sx, sy, INK.C.gold, 24, 1); }
+  },
+
   /* ---------- buffs & payouts ---------- */
-  buffMult: () => (GAME.buffs.frenzy > 0 ? 7 : 1),
-  spitMult: () => (GAME.buffs.spit > 0 ? 4 : 1),
+  // Super Frenzy (Golden Sock) = Bean Frenzy x7 + Spit Frenzy x4 + Golden Hour, all x100
+  buffMult: () => (GAME.buffs.super > 0 ? 7 * ECON.SUPER_X : GAME.buffs.frenzy > 0 ? 7 : 1),
+  spitMult: () => (GAME.buffs.spit > 0 || GAME.buffs.super > 0 ? 4 : 1),
+  allGold: () => GAME.buffs.gold > 0 || GAME.buffs.super > 0,
   refreshPay() {
     const S = G.S, b = GAME.buffMult();
     GAME.payC.length = 0;
-    for (let i = 0; i < S.n; i++) GAME.payC.push(ECON.pay(S, i, b));
+    for (let i = 0; i < S.n; i++) GAME.payC.push(ECON.pay(S, i, b) * (GAME.isShiny(i) ? 3 : 1));   // shiny plants pay x3
     const raw = ECON.rawSpit(S) / GAME.spitMult();
     GAME.spitI = Math.max(ECON.MIN_SPIT, raw); GAME.bx = Math.max(1, ECON.MIN_SPIT / raw);
   },
@@ -106,11 +125,11 @@ const GAME = {
     if (kind === "col" && on) GAME.sweepBanks();
   },
   /* money sitting in bubbles of plants that collect by themselves goes straight into the wallet */
-  sweepBanks() { const S = G.S; for (const k in S.bk) if (S.bk[k] > 0 && GAME.auto(+k)) { S.m += S.bk[k]; S.bk[k] = 0; } },
+  sweepBanks() { const S = G.S; for (const k in S.bk) if (S.bk[k] > 0 && GAME.auto(+k)) { S.m += S.bk[k]; S.bk[k] = 0; S.stats.bubbles++; } },
   ips() {   // current theoretical income incl. buffs
     let s = 0;
     for (const v of GAME.payC) s += v;
-    return s * GAME.bx * (GAME.buffs.gold > 0 ? ECON.GOLD_X : ECON.goldAvg(G.S)) / GAME.spitI;
+    return s * GAME.bx * (GAME.allGold() ? ECON.GOLD_X : ECON.goldAvg(G.S)) / GAME.spitI;
   },
   earn(x, sx, sy) {
     const S = G.S;
@@ -122,7 +141,7 @@ const GAME = {
   spit(poke) {
     const S = G.S;
     if (S.n < 1) return;
-    const gold = GAME.buffs.gold > 0 || Math.random() < ECON.goldChance(S);
+    const gold = GAME.allGold() || Math.random() < ECON.goldChance(S);
     GAME.beans.push({ cur: S.n - 1, u: 0, first: 1, gold, x: 0, y: GAME.geraldWY() + 6, gx: (Math.random() - 0.5) * 90, seed: Math.random() * 1e5 | 0 });
     S.stats.beans++; if (gold) S.stats.golden++;
     GAME.spitAnim = 0.25;
@@ -132,7 +151,11 @@ const GAME = {
   hit(i, gold, sx, sy) {
     const S = G.S, v = (GAME.payC[i] || 0) * GAME.bx * (gold ? ECON.GOLD_X : 1);
     S.run += v; STATE.addEarned(S, v);
-    if (GAME.auto(i)) S.m += v; else S.bk[i] = (S.bk[i] || 0) + v;
+    if (GAME.auto(i)) {
+      S.m += v;
+      // auto-collect pops the bubble for you: it counts for "pop bubbles" quests (at most once per plant every 3 s)
+      const now = S.stats.time; if (!(now - (GAME.autoPop[i] || -9) < 3)) { GAME.autoPop[i] = now; S.stats.bubbles++; }
+    } else S.bk[i] = (S.bk[i] || 0) + v;
     GAME.wob[i] = 1;
     SFX.play("hit", { i });
     if (gold && Math.random() < 0.5 && G.zoom > 0.6) GAME.burst(sx * G.zoom, sy * G.zoom, INK.C.gold, 4);
@@ -158,8 +181,10 @@ const GAME = {
   /* ---------- buying ---------- */
   grow(silent) {
     const S = G.S, c = ECON.spC(S, S.n);
+    if (S.n >= ECON.maxPlants(S)) { if (!silent) { SFX.play("error"); UI.toast("Tiny Pot: " + ECON.TINY_MAX + " plants is all that fits!", "zone"); } return false; }
     if (S.m < c) { if (!silent) SFX.play("error"); return false; }
-    S.m -= c; GAME.sp[S.n] = 0; S.n++; S.stats.sprouts++;
+    S.m -= c; GAME.sp[S.n] = 0; S.n++; S.stats.sprouts++; GAME.lastGrowT = S.runT;
+    GAME.recordDex(S.n - 1);
     if (!silent) UI.toast(GAME.plantInfo(S.n - 1).name + " has sprouted", "grow");
     if (S.n >= ECON.MIN_COMPOST && !S.cc) UI.hint("compost", "Psst. Your stalk is tall enough to feed me now. When growing gets slow, open the Compost tab: I eat the plants, you get mulch and a mountain. Everybody wins. Mostly me.");
     SFX.play("grow");
@@ -216,8 +241,16 @@ const GAME = {
   },
   buyShop(d) {
     const S = G.S, l = ECON.shopL(S, d.id), c = ECON.shopCost(S, d, l);
+    if (S.chal === "shopless") { SFX.play("error"); UI.toast("Closed for Lunch: the Sky Shop is shut this run.", "zone"); return; }
     if (l >= d.max || S.m < c) { SFX.play("error"); return; }
     S.m -= c; S.shop[d.id] = l + 1; SFX.play("shop"); GAME.refreshPay();
+  },
+  buyStar(d) {
+    const S = G.S, l = ECON.starL(S, d.id), c = ECON.starCost(d, l);
+    if ((d.max && l >= d.max) || S.dust < c) { SFX.play("error"); return; }
+    S.dust -= c; S.star[d.id] = l + 1; SFX.play("upgrade", { n: 5 }); GAME.refreshPay();
+    if (d.id === "qshop") for (const x of ECON.SHOP) S.shop[x.id] = Math.max(S.shop[x.id] || 0, Math.min(x.max, l + 1));
+    STATE.save(S);
   },
   buyPerk(d) {
     const S = G.S, l = ECON.perkL(S, d.id), c = ECON.cost(d, l);
@@ -240,6 +273,7 @@ const GAME = {
   /* Sock Shrine: spend socks on a buff (frenzy or golden hour) */
   shrine(kind) {
     const S = G.S, c = ECON.shrine(S, kind);
+    if (S.chal === "nogold") { SFX.play("error"); UI.toast("Golden Silence: no frenzies this run.", "zone"); return; }
     if (S.soc < c) { SFX.play("error"); return; }
     S.soc -= c; GAME.reward(kind === "gold" ? "gold" : "frenzy");
     UI.toast(kind === "gold" ? "The sky accepts your socks. GOLDEN HOUR!" : "The sky accepts your socks. BEAN FRENZY x7!", "visitor", 3);
@@ -281,6 +315,10 @@ const GAME = {
         } else { GAME.beans.splice(j, 1); break; }
       }
     }
+    // golden socks: very rare, only while you play (see ECON.gsockRate)
+    S.gsockT += dt;
+    if (Math.random() < dt * ECON.gsockRate(S) && !GAME.socks.some(k => k.gold)) GAME.addSock(false, true);
+    S.superT = GAME.buffs.super;      // a Super Frenzy survives a reload
     // socks
     T.sock -= dt;
     if (T.sock <= 0) { T.sock = ECON.sockInt(S) * (0.7 + Math.random() * 0.6); GAME.addSock(); }
@@ -306,7 +344,7 @@ const GAME = {
         if (S.m >= cst) { S.m -= cst; S.lv[i] = (S.lv[i] || 0) + 1; S.stats.upgrades++; GAME.wob[i] = Math.max(GAME.wob[i] || 0, 0.4); }
       }
       // Shop Steward perk: buys the cheapest affordable Sky Shop upgrade
-      if (ECON.perkL(S, "shop")) {
+      if (ECON.perkL(S, "shop") && S.chal !== "shopless") {
         let best = null, bc = Infinity;
         for (const d of ECON.SHOP) { const l = ECON.shopL(S, d.id); if (l < d.max) { const c = ECON.shopCost(S, d, l); if (c < bc) { bc = c; best = d; } } }
         if (best && S.m >= bc) { S.m -= bc; S.shop[best.id] = ECON.shopL(S, best.id) + 1; GAME.refreshPay(); }
@@ -323,13 +361,42 @@ const GAME = {
     const alt = ECON.alt(S);
     if (alt > S.rec) S.rec = alt;
     if (!GAME.zoneQueue.length && ECON.zoneOf(alt) > S.zone) GAME.arrive(S.zone + 1);
+    if (S.n > S.best.n) S.best.n = S.n;
+    GAME.checkChal();
+    // Wormsley's Timer: compost by itself once no new plant has grown for a while
+    if (S.autoC.on && ECON.starL(S, "timer") && !GAME.zoneQueue.length && ECON.mulchGain(S) >= 1 && S.runT - (GAME.lastGrowT || 0) > S.autoC.wait) GAME.compost(true);
     // chatter
     GAME.chatter(dt);
     STATE.shift(S);
   },
-  addSock(fast) {
-    GAME.socks.push({ x: G.W * (0.1 + Math.random() * 0.8), y: -40 - Math.random() * (fast ? 200 : 0), t: 0,
-      vy: fast ? 120 + Math.random() * 60 : 52, ph: Math.random() * 6, k: Math.random() * 4 | 0, seed: Math.random() * 1e5 | 0 });
+  addSock(fast, gold) {
+    GAME.socks.push({ x: G.W * (0.15 + Math.random() * 0.7), y: -40 - Math.random() * (fast ? 200 : 0), t: 0,
+      vy: gold ? 30 : fast ? 120 + Math.random() * 60 : 52, ph: Math.random() * 6, k: Math.random() * 4 | 0, seed: Math.random() * 1e5 | 0, gold: gold ? 1 : 0 });
+    if (gold) {
+      G.S.gsockT = 0;
+      SFX.play("golden"); setTimeout(() => SFX.play("golden"), 180); setTimeout(() => SFX.play("visitor"), 360);
+      UI.toast("✨ A GOLDEN SOCK is falling! Catch it! ✨", "gold", 7);
+    }
+  },
+  /* one Golden Sock (caught, or later: from watching an ad on mobile, see ROADMAP.md) */
+  giveGoldenSock(src) {
+    const S = G.S;
+    S.gsock++; if (src === "catch") S.stats.gsocks++;
+    UI.hint("gsock", "A GOLDEN SOCK! Those almost never fall. Use it for a SUPER FRENZY: every frenzy at once, times one hundred. The gold button on the right. Don't waste it. Or do. I'm a worm.", true);
+    UI.refreshAll();
+  },
+  superFrenzy() {
+    const S = G.S;
+    if (S.gsock < 1 || GAME.buffs.super > 0) { SFX.play("error"); return false; }
+    if (S.chal === "nogold") { SFX.play("error"); UI.toast("Golden Silence: save your Golden Sock for after this run.", "zone"); return false; }
+    S.gsock--; S.stats.superF++;
+    GAME.buffs.super = ECON.superDur(S); S.superT = GAME.buffs.super;
+    GAME.refreshPay(); GAME.mood("shock", 4);
+    SFX.play("zone"); SFX.play("buff");
+    GAME.burst(G.W / 2, G.H * 0.45, INK.C.gold, 40, 1); GAME.burst(G.W / 2, G.H * 0.45, INK.C.pink, 30);
+    UI.toast("🌟 SUPER FRENZY! Everything x" + U.num(ECON.superTotal()) + " for " + ECON.superDur(S) + " seconds!", "gold", 5);
+    STATE.save(S);
+    return true;
   },
   addVisitor() {
     const z = ZONES.get(ECON.zoneOf(ECON.alt(G.S)));
@@ -346,10 +413,11 @@ const GAME = {
     return [x, o.y0 + Math.sin(o.t * 1.6) * 24];
   },
   reward(rw, sx, sy) {
-    const S = G.S;
-    if (rw === "frenzy") GAME.buffs.frenzy = Math.min(60, GAME.buffs.frenzy + 20);
-    if (rw === "spit") GAME.buffs.spit = Math.min(60, GAME.buffs.spit + 20);
-    if (rw === "gold") GAME.buffs.gold = Math.min(60, GAME.buffs.gold + 20);
+    const S = G.S, dur = 20 * (1 + ECON.starL(S, "tourist"));      // Tourist Season: buffs last longer
+    if (S.chal === "nogold" && (rw === "frenzy" || rw === "spit" || rw === "gold")) rw = "cash";   // Golden Silence
+    if (rw === "frenzy") GAME.buffs.frenzy = Math.min(3 * dur, GAME.buffs.frenzy + dur);
+    if (rw === "spit") GAME.buffs.spit = Math.min(3 * dur, GAME.buffs.spit + dur);
+    if (rw === "gold") GAME.buffs.gold = Math.min(3 * dur, GAME.buffs.gold + dur);
     if (rw === "socks") for (let k = 0; k < 8; k++) GAME.addSock(true);
     if (rw === "cash") GAME.earn(Math.max(ECON.ips(S) * 60, ECON.spC(S, S.n) * 0.1), sx, sy);
     GAME.refreshPay();
@@ -358,13 +426,17 @@ const GAME = {
 
   /* ---------- zones ---------- */
   arrive(k) {
-    const S = G.S, z = ZONES.get(k), got = [];
+    const S = G.S, z = ZONES.get(k), got = [], replay = k <= S.best.zone;   // been here before, on an earlier planet
     S.zone = Math.max(S.zone, k);
+    if (k > S.best.zone) S.best.zone = k;
+    const mk = Math.max(0, Math.floor((S.best.zone - 14) / 10));        // a Cosmic Landmark every 10 endless layers
+    let landmark = null;
+    if (mk > (S.marks || 0)) { S.marks = mk; landmark = DATA.landmark(mk); got.push("🗿 Cosmic Landmark: " + landmark + ". All payouts x2, forever"); }
     const rel = DATA.RELICS.find(r => r.id === z.relic);
     if (rel && !S.relics[rel.id]) { S.relics[rel.id] = 1; got.push(rel.ic + " " + rel.name + " (" + rel.desc + ")"); }
     if (z.hat && !S.hats[z.hat]) { S.hats[z.hat] = 1; got.push("🎩 New hat: " + DATA.HATS.find(h => h.id === z.hat).name); }
     if (z.trinket) { S.trinkets.push(Object.assign({ z: k }, z.trinket)); got.push("✨ " + z.trinket.name + " (" + z.trinket.desc + ")"); }
-    got.push("📈 Zone bonus: all payouts x1.35");
+    got.push("📈 Zone bonus: all payouts x" + ECON.zoneBase(S).toFixed(2));
     if (z.quest) QUESTS.addSpecial(k);
     if (k === 6) S.flags.moonGone = 1;
     if (k === 14) S.flags.finale = 1;
@@ -372,17 +444,21 @@ const GAME = {
     GAME.mood("shock", 3);
     GAME.zoneQueue.push(k);
     SFX.play("zone");
+    const fresh = got.length > 1 || !replay;          // anything new? (a replayed zone with only the zone bonus just gets a toast)
     const done = () => {
       GAME.zoneQueue.shift();
-      CINE.play("reward", { title: z.name, icon: rel ? rel.ic : "✨", lines: got }, () => { UI.refreshAll(); });
+      if (fresh) CINE.play("reward", { title: z.name, icon: landmark ? "🗿" : rel ? rel.ic : "✨", lines: got }, () => { UI.refreshAll(); });
+      else { UI.toast("Back in " + z.name + " (" + ECON.planetName(S.planet) + ")", "zone", 2.5); UI.refreshAll(); }
       STATE.save(S);
     };
-    if (S.settings.cine !== false && z.arrive) CINE.play("zone", { zone: z }, done);
+    if (S.settings.cine !== false && z.arrive && !replay) CINE.play("zone", { zone: z }, done);
     else { UI.toast("You reached " + z.name + "!", "zone"); done(); }
   },
 
   /* ---------- composting ---------- */
-  compost() {
+  /* every run starts with Frequent Shopper's free Sky Shop levels */
+  freshShop() { const S = G.S, q = ECON.starL(S, "qshop"); S.shop = {}; if (q) for (const d of ECON.SHOP) S.shop[d.id] = Math.min(d.max, q); },
+  compost(quiet) {
     const S = G.S, g = ECON.mulchGain(S);
     if (g < 1) { SFX.play("error"); UI.toast("Wormsley only eats a stalk taller than the last one. Grow to " + ECON.compostNeed(S) + " plants.", "zone", 4); return; }
     const gain = ECON.mtnGain(S), top = GAME.plantInfo(S.n - 1);
@@ -396,7 +472,8 @@ const GAME = {
     S.caps = S.caps || {};
     for (let i = 0; i < S.n; i++) S.caps[i] = (S.caps[i] || 0) + 1;   // every slot you reached gets +5 level cap
     S.mu += g; S.tm += g; S.cc++; S.mtn += gain; S.lastMulch = g; S.stats.composts++;
-    S.m = 0; S.run = 0; S.n = Math.max(1, ECON.headStart(S)); S.lv = {}; S.bk = {}; S.ac = {}; S.shop = {}; S.runT = 0;
+    S.m = 0; S.run = 0; S.n = Math.max(1, Math.min(ECON.maxPlants(S), ECON.headStart(S))); S.lv = {}; S.bk = {}; S.ac = {}; S.runT = 0; GAME.lastGrowT = 0;
+    GAME.freshShop();
     GAME.beans.length = 0; GAME.visitors.length = 0; GAME.socks.length = 0; GAME.parts.length = 0; GAME.floats.length = 0;
     GAME.sel = -1; GAME.lastRun = 0; GAME.ipsM = 0;
     GAME.buffs.frenzy = GAME.buffs.spit = GAME.buffs.gold = 0;
@@ -411,8 +488,56 @@ const GAME = {
       if (first) UI.hint("perks", "Spend mulch on permanent perks in the Compost tab. They survive every compost, forever.", true);
     };
     if (first) CINE.play("compost", p, after);
+    else if (quiet) { UI.toast("⏰ Auto-compost: +" + U.num(g) + " mulch, +" + U.ft(gain), "zone", 2.5); after(); }
     else if (S.settings.cine !== false) CINE.play("compostShort", p, after);
     else { UI.toast("Composted! +" + U.num(g) + " mulch, +" + U.ft(gain), "zone"); after(); }
+  },
+
+  /* ---------- Transplanting: Gerald moves to a new pot on a new planet ----------
+     Resets this planet (money, plants, mulch, perks, mountain, zones, trinkets); keeps relics, hats, socks,
+     sock automation, golden socks, stats, the Plantdex, trophies and everything in the Cosmos tab.
+     chal: start a Weird Run (challenge) on the new planet; null = a normal planet. */
+  transplant(chal) {
+    const S = G.S, g = ECON.dustGain(S), from = ECON.planetName(S.planet), wasChal = S.chal;
+    if (!ECON.transplantOpen(S)) return;
+    S.dust += g; S.dustEver += g; S.stats.transplants++;
+    const keep = chal ? 0 : Math.floor(S.mtn * ECON.bedrock(S));     // challenges start from bare dirt
+    const mem = 0.1 * ECON.starL(S, "memory");
+    for (const id in S.perk) S.perk[id] = Math.floor(S.perk[id] * mem);
+    S.planet++; S.chal = chal || null; S.tEarnL = -1;
+    S.mu = 0; S.tm = 0; S.cc = 0; S.lastN = 0; S.lastMulch = 0; S.caps = {}; S.trinkets = [];
+    S.mtn = keep; S.strata = keep ? [{ h: keep, name: "Bedrock from " + from, n: 0, hue: 28, cc: -1, ghosts: [] }] : [];
+    S.zone = ECON.zoneOf(S.mtn + 1); S.rec = S.mtn + 1;
+    S.quests = S.quests.filter(q => q.sp !== undefined); QUESTS.primed = false;
+    S.m = 0; S.run = 0; S.n = Math.max(1, Math.min(ECON.maxPlants(S), ECON.headStart(S))); S.lv = {}; S.bk = {}; S.ac = {}; S.runT = 0;
+    GAME.freshShop(); GAME.lastGrowT = 0;
+    GAME.beans.length = 0; GAME.visitors.length = 0; GAME.socks.length = 0; GAME.parts.length = 0; GAME.floats.length = 0;
+    GAME.sel = -1; GAME.lastRun = 0; GAME.ipsM = 0; GAME.zoneQueue.length = 0;
+    GAME.buffs.frenzy = GAME.buffs.spit = GAME.buffs.gold = 0;
+    GAME._pi = {}; GAME.refreshPay(); G.follow = true; G.cam = GAME.camFollow();
+    for (let i = 0; i < S.n; i++) GAME.recordDex(i, true);
+    STATE.save(S);
+    const lines = ["⭐ +" + U.num(g) + " Stardust (" + U.num(S.dust) + " to spend in the Cosmos tab)", "🪐 Welcome to " + ECON.planetName(S.planet)];
+    if (keep) lines.push("🪨 Bedrock kept " + U.ft(keep) + " of your mountain");
+    if (chal) { const c = ECON.CHALS.find(x => x.id === chal); lines.push(c.ic + " Weird Run: " + c.name + ". " + c.rule); }
+    else if (wasChal) lines.push("🌀 Weird Run over. Back to normal soil.");
+    const card = () => { CINE.play("reward", { title: "Transplanted!", icon: "🪐", lines }, () => UI.refreshAll()); };
+    UI.refreshAll();
+    if (S.settings.cine !== false && !S.flags.transplanted) CINE.play("transplant", { planet: ECON.planetName(S.planet), dust: g }, card);
+    else card();
+    S.flags.transplanted = 1;
+    SFX.play("zone");
+  },
+  /* Weird Runs: tiers for reaching zones 3/6/9/12/14 while the challenge is on */
+  checkChal() {
+    const S = G.S; if (!S.chal) return;
+    let tier = 0; for (const z of ECON.CHAL_GOALS) if (S.zone >= z) tier++;
+    if (tier <= ECON.chalT(S, S.chal)) return;
+    S.chalT[S.chal] = tier;
+    const c = ECON.CHALS.find(x => x.id === S.chal);
+    GAME.refreshPay(); SFX.play("claim");
+    CINE.play("reward", { title: c.name + ": tier " + tier + "!", icon: c.ic, lines: ["🏅 Reward: " + c.rw + " (now " + tier + "/5)", tier < 5 ? "Next tier at " + ZONES.get(ECON.CHAL_GOALS[tier]).short + ". Or leave the run from the Cosmos tab." : "All 5 tiers done! Leave the run from the Cosmos tab."] });
+    STATE.save(S);
   },
 
   /* ---------- offline ---------- */
@@ -487,7 +612,15 @@ const GAME = {
     let best = -1, bd = Infinity;
     for (let j = 0; j < GAME.socks.length; j++) {
       const k = GAME.socks[j], d = Math.hypot(mx - k.x, my - (k.y + 2));
-      if (d < 38 + fat && d < bd) { bd = d; best = j; }
+      if (d < (k.gold ? 58 : 38) + fat && d < bd) { bd = d; best = j; }
+    }
+    if (best >= 0 && GAME.socks[best].gold) {
+      const k = GAME.socks.splice(best, 1)[0];
+      GAME.giveGoldenSock("catch");
+      GAME.float("GOLDEN SOCK!", k.x, k.y - 20, INK.C.gold);
+      GAME.burst(k.x, k.y, INK.C.gold, 30, 1); GAME.burst(k.x, k.y, "#fff3b0", 16, 1);
+      SFX.play("golden"); SFX.play("claim");
+      return true;
     }
     if (best >= 0) {
       const k = GAME.socks[best], v = ECON.sockVal(S);
@@ -536,6 +669,7 @@ const GAME = {
     GAME.mood("shock", 0.35);
     if (GAME.tm.poke > 0) return;
     GAME.tm.poke = 0.3; S.stats.pokes++;
+    if (S.chal === "grumpy") { if (Math.random() < 0.2) GAME.say(U.pick(["No.", "Not today.", "I'm grumpy. It's a whole run.", "Poke harder. Still no."]), 1.6); SFX.play("poke"); return; }
     GAME.spit(true); SFX.play("poke");
     if (Math.random() < 0.08) GAME.say(U.pick(["Hnk.", "Rude.", "Again. Do it again.", "I felt that.", "OI.", "*spits harder*"]), 1.6);
   },
@@ -571,6 +705,14 @@ const GAME = {
       if (i === GAME.sel) {
         ctx.save(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.setLineDash([7, 6]); ctx.lineDashOffset = -t * 18;
         INK.oval(ctx, px, py + 4, 54, 54, null, true); ctx.restore();
+      }
+      if (GAME.isShiny(i)) {          // shiny: a rainbow halo and sparkles
+        ctx.save(); ctx.translate(px, py + 2);
+        const g = ctx.createRadialGradient(0, 0, 10, 0, 0, 62);
+        g.addColorStop(0, "hsla(" + ((t * 90) % 360) + ",100%,75%,0.55)"); g.addColorStop(1, "hsla(" + ((t * 90 + 120) % 360) + ",100%,70%,0)");
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 62, 0, 6.283); ctx.fill();
+        for (let j = 0; j < 6; j++) { const a = t * 1.3 + j * 1.047, r = 46 + 5 * Math.sin(t * 4 + j); DRAW._star(ctx, Math.cos(a) * r, Math.sin(a) * r * 0.85, 3 + 2 * Math.abs(Math.sin(t * 5 + j)), "#fffbea"); }
+        ctx.restore();
       }
       ctx.save(); ctx.translate(px, py);
       const talk = GAME.says.some(s => s.i === i);
@@ -626,12 +768,47 @@ const GAME = {
       INK.label(ctx, o.v.name, x, y + 66, 14, INK.C.gold);
     }
     for (const k of GAME.socks) {
-      ctx.save(); ctx.translate(k.x, k.y); ctx.rotate(Math.sin(k.t * 2 + k.ph) * 0.5);
-      GAME.safe("sock", () => DRAW.sock(ctx, k.k, t, k.seed));
+      ctx.save(); ctx.translate(k.x, k.y);
+      if (k.gold) GAME.safe("gsock", () => GAME.drawGoldSock(ctx, k, t));
+      else { ctx.rotate(Math.sin(k.t * 2 + k.ph) * 0.5); GAME.safe("sock", () => DRAW.sock(ctx, k.k, t, k.seed)); }
       ctx.restore();
     }
+    if (GAME.buffs.super > 0) GAME.safe("super", () => GAME.drawSuper(ctx, W, H, t));
     GAME.drawFx(ctx, t);
     GAME.safe("overlay", () => WORLD.overlay(ctx, W, H, t));
+    ctx.restore();
+  },
+  /* the Golden Sock: big, glowing, sparkling, slowly spinning down */
+  drawGoldSock(ctx, k, t) {
+    const pulse = 0.5 + 0.5 * Math.sin(t * 5);
+    const g = ctx.createRadialGradient(0, 4, 4, 0, 4, 62);
+    g.addColorStop(0, "rgba(255,236,140," + (0.75 + 0.2 * pulse) + ")"); g.addColorStop(1, "rgba(255,210,63,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 4, 62, 0, 6.283); ctx.fill();
+    for (let j = 0; j < 8; j++) {          // orbiting sparkles
+      const a = t * 1.6 + j * 0.785, r = 40 + 6 * Math.sin(t * 3 + j);
+      ctx.save(); ctx.translate(Math.cos(a) * r, 4 + Math.sin(a) * r * 0.8); ctx.rotate(t * 2 + j);
+      DRAW._star(ctx, 0, 0, 4 + 2 * Math.sin(t * 6 + j), "#fffbea");
+      ctx.restore();
+    }
+    ctx.rotate(Math.sin(k.t * 1.3 + k.ph) * 0.35); ctx.scale(1.7, 1.7); ctx.translate(-7, -15);
+    ctx.strokeStyle = INK.C.ink; ctx.lineWidth = 2.4; ctx.lineJoin = "round";
+    DRAW._sockShape(ctx, 13, 17, "#ffd23f", "#fff3dc", 0);
+    ctx.globalAlpha = 0.55 + 0.45 * pulse; ctx.fillStyle = "#fffbea";
+    ctx.beginPath(); ctx.ellipse(-2, 7, 2, 5, 0.2, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
+  },
+  /* Super Frenzy: the whole screen shimmers gold and rainbow */
+  drawSuper(ctx, W, H, t) {
+    const left = GAME.buffs.super, a = Math.min(1, left / 2) * (0.22 + 0.1 * Math.sin(t * 8));
+    ctx.save();
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.25, W / 2, H / 2, Math.max(W, H) * 0.75);
+    g.addColorStop(0, "rgba(255,210,63,0)"); g.addColorStop(1, "hsla(" + ((t * 120) % 360) + ",100%,65%," + a * 2 + ")");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = Math.min(1, left / 2);
+    for (let j = 0; j < 26; j++) {
+      const x = (Math.sin(j * 77.7) * 0.5 + 0.5) * W, y = ((j * 53 + t * (60 + (j % 5) * 25)) % (H + 40)) - 20;
+      ctx.fillStyle = "hsl(" + ((j * 47 + t * 200) % 360) + ",95%,65%)";
+      ctx.save(); ctx.translate(x, y); ctx.rotate(t * 3 + j); ctx.fillRect(-4, -2, 8, 4); ctx.restore();
+    }
     ctx.restore();
   },
   drawStalk(ctx, cx, t) {
