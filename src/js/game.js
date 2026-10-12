@@ -31,7 +31,8 @@ const GAME = {
     return [Math.max(0, lo), Math.min(G.S.n - 1, hi)];
   },
   /* zoom target: 1 normally, zooming out as the view sinks below the mountain top */
-  zoomTop: () => (G.W < 520 ? 0.85 : 1),      // normal zoom: phones draw the world a bit smaller so more fits
+  // normal zoom: narrow (phone) and short (landscape phone) views draw the world smaller so more of the tower fits
+  zoomTop: () => Math.min(1, G.W < 520 ? 0.85 : 1, Math.max(0.7, G.H / 600)),
   /* zoom follows the mountain's real width (world.js: half-width = 46 + 13.5*sqrt(depth below summit)), so it
      changes gradually as you scroll: the mountain never fills more than 2/3 of the screen (1/6 free each side),
      and near the bottom it zooms out far enough to show the house and Gnome Dave beside it */
@@ -41,9 +42,9 @@ const GAME = {
     const hwAt = d => 46 + 13.5 * Math.sqrt(Math.max(0, d)) + 12;
     let need = 3 * hwAt(U.clamp(mt - G.cam, 0, mt));
     const nearGround = U.clamp((420 - G.cam) / 360, 0, 1);              // fades in as the garden comes into view
-    const k = Math.max(1, Math.min(10, 0.42 / Math.max(0.05, G.zoom)));   // matches the house/gnome scaling in world.js
+    const k = Math.max(1, Math.min(40, 0.42 / Math.max(0.01, G.zoom)));   // matches the house/gnome scaling in world.js
     need = U.lerp(need, Math.max(need, 2 * hwAt(mt) + 460 * k), nearGround);
-    return U.clamp(G.W / need, 0.05, top);
+    return U.clamp(G.W / need, 0.01, top);
   },
 
   /* ---------- plant identity (new weird plants every run; past runs are remembered for the mountain) ---------- */
@@ -479,21 +480,25 @@ const GAME = {
 
   /* ---------- input ---------- */
   bubbleHit: [], ghost: null,
-  click(mx, my, touch) {
-    const S = G.S, fat = touch ? 14 : 0;     // fingers are bigger than cursors
-    for (let j = GAME.socks.length - 1; j >= 0; j--) {
-      const k = GAME.socks[j];
-      if (Math.hypot(mx - k.x, my - k.y) < 38 + fat) {
-        const v = ECON.sockVal(S);
-        S.soc += v; S.stats.socks++;
-        GAME.socks.splice(j, 1);
-        GAME.float("+" + U.num(v) + " 🧦", k.x, k.y, INK.C.pink);
-        GAME.flyTo("hudSocks", k.x, k.y, "sock", 1);
-        GAME.burst(k.x, k.y, INK.C.pink, 6, 1);
-        SFX.play("sock");
-        if (S.soc >= 6) UI.hint("socks", "Socks buy automation! Click a plant and spend socks so it upgrades or collects by itself.");
-        return;
-      }
+  /* moving things (socks, visitors) are caught the moment you press down, so chasing one with the mouse or a
+     finger can never turn into a drag; the nearest one under the pointer wins */
+  catchAt(mx, my, touch) {
+    const S = G.S, fat = touch ? 18 : 6;
+    let best = -1, bd = Infinity;
+    for (let j = 0; j < GAME.socks.length; j++) {
+      const k = GAME.socks[j], d = Math.hypot(mx - k.x, my - (k.y + 2));
+      if (d < 38 + fat && d < bd) { bd = d; best = j; }
+    }
+    if (best >= 0) {
+      const k = GAME.socks[best], v = ECON.sockVal(S);
+      S.soc += v; S.stats.socks++;
+      GAME.socks.splice(best, 1);
+      GAME.float("+" + U.num(v) + " 🧦", k.x, k.y, INK.C.pink);
+      GAME.flyTo("hudSocks", k.x, k.y, "sock", 1);
+      GAME.burst(k.x, k.y, INK.C.pink, 6, 1);
+      SFX.play("sock");
+      if (S.soc >= 6) UI.hint("socks", "Socks buy automation! Click a plant and spend socks so it upgrades or collects by itself.");
+      return true;
     }
     for (let j = GAME.visitors.length - 1; j >= 0; j--) {
       const o = GAME.visitors[j], [x, y] = GAME.visitorPos(o);
@@ -503,9 +508,14 @@ const GAME = {
         GAME.reward(o.v.rw, x, y);
         UI.toast(o.v.name + ": " + o.v.line, "visitor", 5);
         GAME.float(DATA.REWARD_NAMES[o.v.rw], x, y - 30, INK.C.gold);
-        return;
+        return true;
       }
     }
+    return false;
+  },
+  click(mx, my, touch) {
+    const fat = touch ? 14 : 0;     // fingers are bigger than cursors
+    if (GAME.catchAt(mx, my, touch)) return;
     // everything below lives in the (possibly zoomed) world: convert to virtual coordinates
     const z = G.zoom, vx = mx / z, vy = my / z, vf = fat / z;
     for (const b of GAME.bubbleHit) if (Math.hypot(vx - b.x, vy - b.y) < b.r + 10 + vf) { GAME.collect(b.i, b.x * z, b.y * z); return; }
@@ -676,8 +686,8 @@ const GAME = {
         ctx.stroke();
       }
       ctx.lineWidth = 2.5; ctx.strokeStyle = INK.C.ink;
-      const step = 64, s0 = Math.max(step, Math.ceil(y0 / step) * step);
-      for (let wy = s0; wy < y1 - 20; wy += step) {
+      const step = 64 * (G.zoom < 0.3 ? 2 : 1), s0 = Math.max(step, Math.ceil(y0 / step) * step);
+      if (G.zoom >= 0.15) for (let wy = s0; wy < y1 - 20; wy += step) {   // leaves (too small to see when zoomed far out)
         const k = Math.round(wy / step), d = k % 2 ? 1 : -1;
         ctx.save(); ctx.translate(wx(wy) + d * 8, GAME.toY(wy)); ctx.rotate(d * 0.95);
         INK.blob(ctx, d * 10, 0, 12, 5, "#5a8a46", true, k, 0.08); ctx.restore();

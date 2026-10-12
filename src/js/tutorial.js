@@ -82,11 +82,11 @@ const TUT = {
     arrow.classList.remove("hidden");
     arrow.style.left = p[0] + "px"; arrow.style.top = p[1] + "px";
     // keep the box from covering what it points at: flip it to the top if the target sits behind it
-    const box = $("tutor"), boxTop = G.H - 56 - box.offsetHeight;
+    const box = $("tutor"), boxTop = G.H - (UI.mobile() ? 8 : 56) - box.offsetHeight;
     const low = p[1] + 90 > boxTop;
     if (low !== TUT.atTop) {
       TUT.atTop = low;
-      const ob = $("objective"), under = ob.offsetTop + ob.offsetHeight + 10;   // sit just below the objective banner
+      const ob = $("objective"), under = Math.max(UI.hudBottom || 0, ob.offsetTop + ob.offsetHeight) + 10;   // just below the HUD cards
       box.style.cssText = low ? "top:" + under + "px;bottom:auto" : "";
     }
   },

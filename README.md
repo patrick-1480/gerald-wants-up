@@ -7,6 +7,8 @@ forwards it, past the Sun, off the edge of the map, behind the universe, and up 
 ## Play
 - Shareable single file: `Gerald Wants Up.html` (double-click it). Build it with `node tools/build.js`.
 - Dev version: `src/index.html` (served by the `gerald-wants-up` launch config on port 8777).
+- Steam desktop version: `steam/` (Electron + Steam account, achievements, Steam Cloud). See `steam/README.md`.
+  After changing `src/`, run `npm run sync` in `steam/` to copy the changes over.
 
 ## Layout
 - `src/js/econ.js` economy (log-space, never overflows), `data.js` all writing/content, `zones.js` story + endless zones

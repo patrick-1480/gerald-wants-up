@@ -1,0 +1,27 @@
+// SteamPipe upload script for Gerald Wants Up (Windows).
+// 1. Replace 1000000 with your App ID and 1000001 with your Windows depot ID (Steamworks > SteamPipe > Depots).
+// 2. npm run dist   (makes dist\win-unpacked)
+// 3. steamcmd +login YOUR_STEAM_LOGIN +run_app_build "D:\Claude\GeraldWantsUp\steam\steampipe\app_build.vdf" +quit
+//    (steamcmd.exe is in the Steamworks SDK: sdk\tools\ContentBuilder\builder\)
+// 4. In Steamworks > SteamPipe > Builds, set the new build live on the "default" branch.
+"AppBuild"
+{
+	"AppID"		"1000000"
+	"Desc"		"Gerald Wants Up"
+	"ContentRoot"	"..\dist\win-unpacked\"
+	"BuildOutput"	"output\"
+	"SetLive"	""
+	"Depots"
+	{
+		"1000001"
+		{
+			"FileMapping"
+			{
+				"LocalPath"	"*"
+				"DepotPath"	"."
+				"recursive"	"1"
+			}
+			"FileExclusion" "*.pdb"
+		}
+	}
+}

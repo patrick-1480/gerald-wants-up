@@ -8,6 +8,7 @@ const WORLD = (function () {
   const gS = () => (typeof G !== "undefined" && G && G.S) || null;
   const low = () => { const S = gS(); return !!(S && S.settings && (S.settings.lowfx || S.settings.perf)); };
   let VW = 800, VH = 600;                                         // viewport for look-at maths
+  let ZM = 1;                                                     // current zoom: far out, details too small to see are skipped
   const LK = { x: 0, y: 0 };                                      // reused look vector
   const C = { sky: new Map(), pal: new Map(), fog: new Map(), str: new Map(), img: {}, pat: {}, grad: {} };
   const trim = m => { if (m.size > 500) m.clear(); };
@@ -349,7 +350,7 @@ const WORLD = (function () {
       c.beginPath(); c.moveTo(x - 3, y0 + 2); c.lineTo(x - 4 + sw, y0 - 9); c.moveTo(x + 2, y0 + 2); c.lineTo(x + 4 + sw, y0 - 7); c.stroke();
     }
     // house + gnome stand just beyond the mountain's foot; when zoomed far out they grow so they stay visible
-    const k = Math.max(1, Math.min(10, 0.42 / zoom));
+    const k = Math.max(1, Math.min(40, 0.42 / zoom));
     const hx = cx - hwB - 150 * k, gx = cx + hwB + 62 * k;
     if (hx > -90 * k) { c.save(); c.translate(hx, y0 + 2); c.scale(k, k); cottage(c, 0, 0, t); c.restore(); }
     if (gx < W + 30 * k) { c.save(); c.translate(gx, y0 + 2); c.scale(k, k); gnome(c, 0, 0, (cx - gx) / k, t); c.restore(); }
@@ -422,7 +423,7 @@ const WORLD = (function () {
     ov(c, hx - side * 2, hy - 1, 1.6, 1.6, INK.C.ink, false);
   }
   function band(c, i, s, cx, W, H, ya, yb, wa, wb, t, top) {
-    const col = stratCol(i, s), st = 32, sl = (ya - yb) / Math.max(1, wb - wa);
+    const col = stratCol(i, s), st = Math.max(32, 8 / ZM), sl = (ya - yb) / Math.max(1, wb - wa);
     const room = w => mhw(top - w) - 40;           // usable half-width inside the mound at world y w
     c.beginPath();
     for (let x = -st; x <= W + st; x += st) c.lineTo(x, ya + wave(x - cx, wa));
@@ -430,7 +431,7 @@ const WORLD = (function () {
     c.closePath(); c.fillStyle = col.f; c.fill();
     // details on a world-space grid of rows: constant density whatever the band size, only visible rows
     const RH = 46, Y = w => ya - (w - wa) * sl;
-    for (let r = Math.floor(wa / RH); r * RH < wb; r++) {
+    if (ZM >= 0.14) for (let r = Math.floor(wa / RH); r * RH < wb; r++) {
       const wc = (r + 0.5) * RH; if (wc < wa + 8 || wc > wb - 8) continue;
       const y = Y(wc); if (y < -30 || y > H + 30) continue;
       const q = i * 7919 + r * 131;
@@ -440,15 +441,16 @@ const WORLD = (function () {
         c.quadraticCurveTo(sx, y + 6 + (hr(q, 4) - 0.5) * 12, sx + sw / 2, y + 6); c.stroke();
       }
       c.strokeStyle = col.d; c.lineWidth = 1.2;
-      for (let j = 0; j < 3; j++) {
+      if (ZM >= 0.3) for (let j = 0; j < 3; j++) {
         const px = cx + (hr(q + j, 5) * 2 - 1) * 470, py = y + (hr(q + j, 6) - 0.5) * RH;
         if (px > -10 && px < W + 10) ov(c, px, py, 2.5 + 4 * hr(q + j, 7), 2 + 2.5 * hr(q + j, 8), col.l, true);
       }
       const bx = cx + (hr(q, 11) * 2 - 1) * 360;
+      if (ZM < 0.22) continue;
       if (hr(q, 10) < 0.16 + Math.min(0.2, (s.n | 0) / 150) && Math.abs(bx - cx) > 30) beanBone(c, bx, y, q);
       else if (hr(q, 10) > 0.93) fossil(c, q % 3, bx, y, 9 + hr(q, 12) * 6, col, q);
     }
-    for (let j = 0; (j + 0.45) * 520 < wb - wa; j++) {          // worm tunnels (with tiny worms in tiny hats)
+    if (ZM >= 0.12) for (let j = 0; (j + 0.45) * 520 < wb - wa; j++) {          // worm tunnels (with tiny worms in tiny hats)
       const sd = i * 13 + j * 5 + 5, ty = Y(wb - (j + 0.45) * 520 + 140);
       if (ty < -40 || ty > H + 40 || wb - wa < 90) continue;
       const side = (i + j) % 2 ? 1 : -1, wty = wb - (j + 0.45) * 520 + 140, off = Math.min(210 + hr(sd, 1) * 180, room(wty) - 10);
@@ -459,13 +461,13 @@ const WORLD = (function () {
     for (let x = -st; x <= W + st; x += st) c.lineTo(x, yb + wave(x - cx, wb));
     c.stroke();
     const tw = Math.max(wa + 4, wb - (wb >= top - 2 ? 120 : 64)), ts = i % 2 ? 1 : -1, tX = cx + ts * Math.max(40, Math.min(95 + hr(i, 9) * 80, room(tw) - 40)), tY = Y(tw) + 8;
-    if (tY > -10 && tY < H + 90) tomb(c, tX, tY, i, s, t);
+    if (ZM >= 0.13 && tY > -10 && tY < H + 90) tomb(c, tX, tY, i, s, t);
   }
   function mound(c, v, S, W, H, cx, y0, top, t, sl) {
     const wyAt = y => (y0 - y) / sl;
     const dA = Math.max(0, top - wyAt(-40)), dB = Math.min(top, top - wyAt(H + 40));
     if (dA >= dB) return;
-    const Y = d => v.toY(top - d), st = 18, base = dB >= top;
+    const Y = d => v.toY(top - d), st = Math.max(18, 5 / ZM), base = dB >= top;
     const sidePath = (s, open) => {        // s = -1 left (top->bottom), 1 right (bottom->top)
       if (s < 0) { for (let d = dA; ; d += st) { const q = Math.min(d, dB); const x = cx - mhw(q) - mwob(q, -1); open && q === dA ? c.moveTo(x, Y(q)) : c.lineTo(x, Y(q)); if (q >= dB) break; } }
       else { for (let d = dB; ; d -= st) { const q = Math.max(d, dA); const x = cx + mhw(q) + mwob(q, 1); open && q === dB ? c.moveTo(x, Y(q)) : c.lineTo(x, Y(q)); if (q <= dA) break; } }
@@ -525,7 +527,7 @@ const WORLD = (function () {
   function ground(c, v, t) {
     const S = gS(); if (!S || !v || !v.toY) return;
     const W = v.W, H = v.H, cx = v.cx === undefined ? W / 2 : v.cx, gap = v.gap || GAP;
-    VW = W; VH = H;
+    VW = W; VH = H; ZM = v.zoom || 1;
     const y0 = v.toY(0), sl = y0 - v.toY(1) || 1, top = Math.max(0, S.mtn || 0) * gap, yTop = v.toY(top);
     if (yTop > H + 90) return;
     c.save(); c.lineCap = "round"; c.lineJoin = "round";

@@ -219,16 +219,15 @@ const UI = {
     UI.set("hudMulchN", U.num(S.mu));
     $("hudMulch").classList.toggle("hidden", !S.tm);
     // buffs
-    const bf = [];
-    if (GAME.buffs.frenzy > 0) bf.push("🔥 BEAN FRENZY x7 · " + Math.ceil(GAME.buffs.frenzy) + "s");
-    if (GAME.buffs.spit > 0) bf.push("💨 SPIT FRENZY x4 · " + Math.ceil(GAME.buffs.spit) + "s");
-    if (GAME.buffs.gold > 0) bf.push("✨ GOLDEN HOUR · " + Math.ceil(GAME.buffs.gold) + "s");
+    const bf = [], sm = G.W < 640;      // small game view: short buff labels so the money card stays narrow
+    if (GAME.buffs.frenzy > 0) bf.push((sm ? "🔥 x7 " : "🔥 BEAN FRENZY x7 · ") + Math.ceil(GAME.buffs.frenzy) + "s");
+    if (GAME.buffs.spit > 0) bf.push((sm ? "💨 x4 " : "💨 SPIT FRENZY x4 · ") + Math.ceil(GAME.buffs.spit) + "s");
+    if (GAME.buffs.gold > 0) bf.push((sm ? "✨ gold " : "✨ GOLDEN HOUR · ") + Math.ceil(GAME.buffs.gold) + "s");
     const bs = bf.join("|");
     if (UI.sig.buffs !== bs) { UI.sig.buffs = bs; $("hudBuffs").innerHTML = bf.map(b => '<span class="buff">' + b + "</span>").join(""); }
     UI.objective();
     UI.altMeter();
-    const ob = $("objective"), hl = $("hudLeft");
-    UI.hudBottom = Math.max(ob.offsetTop + ob.offsetHeight, hl.offsetTop + hl.offsetHeight);
+    UI.layoutHud();
     // badges
     const qd = S.quests.filter(q => q.done).length;
     UI.set("qBadge", qd ? qd + "" : "", undefined, qd ? "on" : "");
@@ -239,6 +238,38 @@ const UI = {
     else if (UI.tab === "compost") UI.updCompost();
     else if (UI.tab === "stuff") UI.updStuff();
     UI.updMenu();
+  },
+  /* the top HUD cards can never overlap: the goal card sits between the money card and the round buttons when
+     there is room (centred if it can be), otherwise it drops below the money card */
+  layoutHud() {
+    const hud = $("hud"), hl = $("hudLeft"), ob = $("objective"), hr = $("hudRight"), gap = 6;
+    const HW = hud.clientWidth, left = hl.offsetLeft + hl.offsetWidth + gap, right = hr.offsetLeft - gap;
+    const want = Math.min(420, Math.max(230, HW * 0.46)), room = right - left, min = Math.min(want, HW < 520 ? 150 : 230);
+    let x, y, w;
+    if (room >= min) { w = Math.min(want, room); x = U.clamp((HW - w) / 2, left, right - w); y = hl.offsetTop; }
+    else { x = hl.offsetLeft; y = hl.offsetTop + hl.offsetHeight + gap; w = Math.min(want, right - x); }
+    const k = x + "|" + y + "|" + w;
+    if (UI.sig.hud !== k) {
+      UI.sig.hud = k;
+      Object.assign(ob.style, { left: x + "px", top: y + "px", width: w + "px", right: "auto", transform: "none" });
+    }
+    UI.hudBottom = Math.max(ob.offsetTop + ob.offsetHeight, hl.offsetTop + hl.offsetHeight, hr.offsetTop + 46);
+    // the alt meter starts below whatever is on the right
+    const am = $("altMeter"); if (am.offsetParent) am.style.top = Math.max(hr.offsetTop + hr.offsetHeight, UI.hudBottom) + 14 + "px";
+    UI.layoutBottom();
+  },
+  /* bottom of the game view: the docked plant menu sits above Wormsley's tips, and toasts float above both */
+  layoutBottom() {
+    const st = $("stage").getBoundingClientRect(), tu = $("tutor"), m = $("plantMenu"), ts = $("toasts");
+    const tr = tu.getBoundingClientRect(), tutH = tu.classList.contains("hidden") || tr.top < st.top + st.height / 2 ? 0 : st.bottom - tr.top + 2;
+    const docked = m.classList.contains("docked") && !m.classList.contains("hidden");
+    if (docked) m.style.bottom = (tutH ? tutH + 8 : 6) + "px";
+    let b = innerHeight - st.bottom + (UI.mobile() ? 12 : (G.H > 480 ? 58 : 12));
+    if (tutH) b = Math.max(b, innerHeight - tr.top + 8);
+    if (docked) b = Math.max(b, innerHeight - m.getBoundingClientRect().top + 8);
+    ts.style.bottom = b + "px";
+    ts.style.left = (st.left + st.width / 2) + "px";
+    ts.style.width = Math.min(520, st.width - 16) + "px";
   },
   objective() {
     const S = G.S, k = S.zone + 1, z = ZONES.get(k), alt = ECON.alt(S);
@@ -438,15 +469,24 @@ const UI = {
   },
   placeMenu() {
     const i = GAME.sel, m = $("plantMenu");
-    if (i < 0 || m.classList.contains("hidden")) return;
+    if (i < 0 || m.classList.contains("hidden")) { m._sel = -1; return; }
     const dock = UI.mobile() || G.W < 520;     // small screens: menu docks to the bottom instead of floating
     m.classList.toggle("docked", dock);
-    if (dock) { m.style.visibility = "visible"; return; }
+    if (dock) {
+      m.style.visibility = "visible"; if (!m._dk) { m._dk = 1; UI.layoutBottom(); }
+      if (m._sel !== i) {       // nudge the camera so the chosen plant isn't hidden behind the docked menu
+        m._sel = i;
+        const sy = GAME.toY(GAME.plantWY(i)) * G.zoom, mt = m.offsetTop, want = Math.max((UI.hudBottom || 0) + 70, mt - 80);
+        if (sy > mt - 50) { G.follow = false; G.camTo = U.clamp(G.cam - (sy - want) / G.zoom, -90, GAME.camMax()); }
+      }
+      return;
+    }
+    m._dk = 0; m.style.bottom = "";
     const sx = GAME.plantSX(i), sy = GAME.toY(GAME.plantWY(i)), w = 240;
     if (sy < -40 || sy > G.H + 40) { m.style.visibility = "hidden"; return; }
     m.style.visibility = "visible";
     const left = GAME.side(i) > 0 ? (sx + 60 + w < G.W ? sx + 60 : sx - 60 - w) : (sx - 60 - w > 0 ? sx - 60 - w : sx + 60);
     m.style.left = U.clamp(left, 6, G.W - w - 6) + "px";
-    m.style.top = U.clamp(sy - 80, 6, G.H - m.offsetHeight - 50) + "px";
+    m.style.top = U.clamp(sy - 80, (UI.hudBottom || 0) + 6, Math.max((UI.hudBottom || 0) + 6, G.H - m.offsetHeight - 50)) + "px";
   },
 };

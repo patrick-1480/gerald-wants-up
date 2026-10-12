@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gerald Art Export</title>
+<link rel="stylesheet" href="../app/css/steam.css">
+<style>
+  body { background: #2a1445; color: #fff3dc; font: 16px "Gaegu", sans-serif; margin: 0; padding: 16px; }
+  h1, h2 { font-family: "Chewy", cursive; color: #ffd23f; margin: 10px 0; }
+  .grid { display: flex; flex-wrap: wrap; gap: 12px; }
+  figure { margin: 0; text-align: center; font-size: 13px; }
+  canvas { background: repeating-conic-gradient(#3a1f55 0 25%, #4a2a6c 0 50%) 0 0 / 16px 16px; border: 2px solid #1d0f2b; display: block; }
+  p { max-width: 760px; }
+</style>
+</head>
+<body>
+<h1>Gerald Wants Up: art for Steam</h1>
+<p>Everything here is drawn by the game's own code. Right-click any picture and choose "Save image as..." to save it.
+The app icon (build/icon.png) and the Steamworks achievement icons come from here.</p>
+<p><button id="saveBtn" onclick="saveAll()">Save all into the project</button> <span id="saveSt"></span></p>
+<h2>App icon</h2><div class="grid" id="icons"></div>
+<h2>Achievement icons (64x64: unlocked, then locked/grey)</h2><div class="grid" id="ach"></div>
+<script src="../app/js/econ.js"></script>
+<script src="../app/js/data.js"></script>
+<script src="../app/js/ink.js"></script>
+<script src="../app/js/util.js"></script>
+<script src="../app/js/zones.js"></script>
+<script src="../app/js/draw.js"></script>
+<script src="../app/js/icons.js"></script>
+<script>
+/* the app icon: grumpy Gerald on his stalk, the Moon watching */
+function appIcon(N) {
+  const c = document.createElement("canvas"); c.width = c.height = N; const x = c.getContext("2d"), k = N / 512;
+  x.scale(k, k);
+  const g = x.createRadialGradient(256, 180, 20, 256, 256, 384); g.addColorStop(0, "#ffb35c"); g.addColorStop(0.55, "#c25bd6"); g.addColorStop(1, "#3a1f55");
+  x.beginPath(); x.roundRect(8, 8, 496, 496, 110); x.fillStyle = g; x.fill(); x.lineWidth = 16; x.strokeStyle = "#1d0f2b"; x.stroke();
+  x.save(); x.beginPath(); x.roundRect(16, 16, 480, 480, 102); x.clip();
+  x.save(); x.translate(410, 102); x.strokeStyle = INK.C.ink; x.lineWidth = 6; DRAW.moonFace(x, 62, { t: 1, mood: "smug", look: { x: -1, y: 0.6 } }); x.restore();
+  x.lineCap = "round"; x.strokeStyle = "#1d0f2b"; x.lineWidth = 64; x.beginPath(); x.moveTo(225, 552); x.quadraticCurveTo(287, 410, 236, 307); x.stroke();
+  x.strokeStyle = "#5fb85a"; x.lineWidth = 42; x.stroke();
+  x.save(); x.translate(236, 256); x.scale(4.3, 4.3); DRAW.gerald(x, { t: 1, spit: 0, look: { x: 0.7, y: -0.8 }, hat: "none", mood: "grump", blink: 0, neck: false }); x.restore();
+  x.restore();
+  return c;
+}
+/* achievement icons: keep in step with STEAM.ACH in app/js/steam.js */
+const ACH = [["ACH_FIRST_SPROUT","sprouts"],["ACH_RUDE","pokes"],["ACH_CLOUDS","tall"],["ACH_PARLIAMENT","tall"],["ACH_ATTIC","tall"],["ACH_MOON","moon"],
+  ["ACH_LAUNDROMAT","socks"],["ACH_SUN","tall"],["ACH_FOURTH_WALL","tall"],["ACH_ENDLESS","tall"],["ACH_LAYER_10","tall"],["ACH_COMPOST","compost"],
+  ["ACH_COMPOST_10","compost"],["ACH_COMPOST_50","compost"],["ACH_SOCKS_100","socks"],["ACH_SOCKS_1000","socks"],["ACH_BUTLER","socks"],["ACH_VISITORS","visitors"],
+  ["ACH_GOLDEN","golden"],["ACH_QUESTS","unknown"],["ACH_UPGRADES","upgrades"],["ACH_PLANTS_50","level"],["ACH_MILLION","earn"],["ACH_GOOGOL","earn"],["ACH_HATS","hat"],["ACH_RELICS","bubbles"]];
+function achIcon(type, grey) {
+  const c = document.createElement("canvas"); c.width = c.height = 64; const x = c.getContext("2d");
+  x.fillStyle = grey ? "#3b3546" : "#4a2a6c"; x.fillRect(0, 0, 64, 64);
+  x.save(); x.translate(32, 32); if (grey) x.filter = "grayscale(1) brightness(.75)";
+  if (type === "moon") { x.strokeStyle = INK.C.ink; x.lineWidth = 2.5; DRAW.moonFace(x, 24, { t: 1, mood: "smug", look: { x: -0.5, y: 0.5 } }); }
+  else if (type === "hat") { x.scale(0.55, 0.55); x.translate(0, 18); DRAW.gerald(x, { t: 1, spit: 0, look: { x: 0.4, y: -0.2 }, hat: "tophat", mood: "grump", blink: 0, neck: false }); }
+  else { x.scale(1.2, 1.2); DRAW.questIcon(x, type, 50, 1); }
+  x.restore();
+  return c;
+}
+function add(box, c, label) { const f = document.createElement("figure"); f.appendChild(c); const l = document.createElement("figcaption"); l.textContent = label; f.appendChild(l); box.appendChild(f); }
+document.fonts.ready.then(() => {
+  for (const n of [512, 256, 64, 32]) add(document.getElementById("icons"), appIcon(n), "icon " + n + "x" + n);
+  for (const [id, type] of ACH) { add(document.getElementById("ach"), achIcon(type, false), id); add(document.getElementById("ach"), achIcon(type, true), id + "_locked"); }
+});
+window.png = c => c.toDataURL("image/png").split(",")[1];
+/* "Save all" only works when this page is opened through  npm run art  (tools/art-server.js) */
+async function saveAll() {
+  const st = document.getElementById("saveSt"), put = (name, c) => fetch("/save?name=" + name, { method: "POST", body: png(c) });
+  try {
+    await put("build/icon.png", document.querySelector("#icons canvas"));
+    for (const f of document.querySelectorAll("#ach figure")) await put("art/achievements/" + f.textContent.toLowerCase() + ".png", f.querySelector("canvas"));
+    st.textContent = "Saved build/icon.png and " + document.querySelectorAll("#ach figure").length + " achievement icons into art/achievements/.";
+  } catch (e) { st.textContent = "Couldn't save (open this page with: npm run art)."; }
+}
+</script>
+</body>
+</html>

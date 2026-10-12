@@ -1,5 +1,5 @@
 /* Gerald Wants Up — boot, title screen, main loop, camera, input, offline, autosave. */
-const G = { S: null, T: 0, W: 800, H: 600, vW: 800, vH: 600, zoom: 1, cam: 0, camTo: null, follow: true, mouse: { x: 0, y: 0, in: false },
+const G = { S: null, T: 0, W: 800, H: 600, vW: 800, vH: 600, zoom: 1, cam: 0, camTo: null, follow: true, fling: 0, mouse: { x: 0, y: 0, in: false },
   canvas: null, ctx: null, started: false, wiping: false };
 
 const MAIN = {
@@ -79,6 +79,10 @@ const MAIN = {
       if (Math.abs(G.zoom - zt) < 0.002) G.zoom = zt;
       G.vW = G.W / G.zoom; G.vH = G.H / G.zoom;
       const mx = GAME.camMax();
+      if (G.fling) {        // touch flick momentum
+        if (G.follow || G.camTo !== null || MAIN.drag) G.fling = 0;
+        else { G.cam += G.fling * dt; G.fling *= Math.exp(-3.2 * dt); if (Math.abs(G.fling) < 30) G.fling = 0; if (G.cam >= mx - 30 && G.fling > 0) { G.fling = 0; G.follow = true; } }
+      }
       if (G.follow) G.cam += (GAME.camFollow() - G.cam) * Math.min(1, dt * 3);
       else if (G.camTo !== null) { G.cam += (G.camTo - G.cam) * Math.min(1, dt * 4); if (Math.abs(G.camTo - G.cam) < 2) G.camTo = null; }
       G.cam = U.clamp(G.cam, -90, mx);   // a little below 0 so the roots clear the news ticker
@@ -118,9 +122,10 @@ const MAIN = {
     const cv = G.canvas;
     cv.addEventListener("pointerdown", e => {
       if (UI.mobile() && $("panel").classList.contains("open")) UI.sheet(false);   // tapping the game closes the sheet
-      const [x, y] = MAIN.pt(e);
-      MAIN.drag = { x, y, cam: G.cam, moved: false };
-      G.mouse.x = x; G.mouse.y = y; G.mouse.in = true;
+      const [x, y] = MAIN.pt(e), touch = e.pointerType !== "mouse";
+      G.mouse.x = x; G.mouse.y = y; G.mouse.in = true; G.fling = 0;
+      if (G.started && !CINE.active && GAME.catchAt(x, y, touch)) { MAIN.drag = null; return; }   // socks: caught on press
+      MAIN.drag = { x, y, ly: y, lt: performance.now(), v: 0, moved: false, tol: touch ? 11 : 7 };
       cv.setPointerCapture(e.pointerId);
     });
     cv.addEventListener("pointermove", e => {
@@ -128,19 +133,27 @@ const MAIN = {
       G.mouse.x = x; G.mouse.y = y; G.mouse.in = true;
       const d = MAIN.drag;
       if (d) {
-        if (Math.abs(y - d.y) > 7 || Math.abs(x - d.x) > 7) d.moved = true;
-        if (d.moved) { G.follow = false; G.camTo = null; G.cam = U.clamp(d.cam + (y - d.y) / G.zoom, -90, GAME.camMax()); if (G.cam >= GAME.camMax() - 30) G.follow = true; }
+        if (Math.abs(y - d.y) > d.tol || Math.abs(x - d.x) > d.tol) d.moved = true;
+        if (d.moved) {
+          // relative to the last move (not the press point), so the camera never runs away while the zoom changes
+          const now = performance.now(), dy = (y - d.ly) / G.zoom, dt = Math.max(1, now - d.lt) / 1000;
+          d.v = d.v * 0.5 + (dy / dt) * 0.5; d.ly = y; d.lt = now;
+          G.follow = false; G.camTo = null; G.cam = U.clamp(G.cam + dy, -90, GAME.camMax());
+          if (G.cam >= GAME.camMax() - 30) G.follow = true;
+        }
       }
     });
     cv.addEventListener("pointerup", e => {
       const d = MAIN.drag; MAIN.drag = null;
-      if (d && !d.moved && G.started && !CINE.active) { const [x, y] = MAIN.pt(e); GAME.click(x, y, e.pointerType !== "mouse"); }
+      if (!d) return;
+      if (!d.moved) { if (G.started && !CINE.active) { const [x, y] = MAIN.pt(e); GAME.click(x, y, e.pointerType !== "mouse"); } }
+      else if (performance.now() - d.lt < 90 && Math.abs(d.v) > 250 && !G.follow) G.fling = U.clamp(d.v, -9000, 9000);   // flick to keep scrolling
     });
     cv.addEventListener("pointercancel", () => (MAIN.drag = null));
     cv.addEventListener("pointerleave", () => { if (!MAIN.drag) G.mouse.in = false; });
     cv.addEventListener("wheel", e => {
       e.preventDefault();
-      G.follow = false; G.camTo = null;
+      G.follow = false; G.camTo = null; G.fling = 0;
       G.cam = U.clamp(G.cam - e.deltaY / G.zoom, -90, GAME.camMax());
       if (G.cam >= GAME.camMax() - 30) G.follow = true;
     }, { passive: false });

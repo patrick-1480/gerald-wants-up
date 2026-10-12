@@ -1,0 +1,4 @@
+# Steam desktop build: dependencies and build output are re-made with npm install / npm run dist
+steam/node_modules/
+steam/dist/
+steam/steampipe/output/

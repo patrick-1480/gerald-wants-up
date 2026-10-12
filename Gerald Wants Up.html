@@ -53,7 +53,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #hudBuffs { display: flex; flex-direction: column; gap: 3px; margin-top: 5px; }
 .buff { font: 15px var(--display); color: var(--ink); background: var(--gold); border: 2px solid var(--ink); border-radius: 10px; padding: 1px 8px; animation: pul .8s infinite alternate; }
 @keyframes pul { to { transform: scale(1.05) rotate(-1deg); } }
-#objective { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: min(420px, 46%); text-align: left; cursor: pointer; }
+#objective { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: min(420px, 46%); text-align: left; cursor: pointer; }   /* placed by UI.layoutHud */
 #objective:hover { filter: brightness(1.15); }
 .objTop { display: flex; gap: 8px; align-items: center; font: 18px/1.1 var(--display); color: var(--gold); letter-spacing: .3px; }
 .objIcon { font-size: 20px; }
@@ -211,7 +211,9 @@ textarea { width: 100%; height: 90px; background: var(--pn2); color: var(--cream
   #hudLeft .sub { font-size: 12px; }
   .chips { gap: 4px; margin-top: 2px; }
   .chip { font-size: 12px; padding: 0 6px; }
-  #hud #objective { top: 6px; left: auto; right: 48px; width: calc(100% - 178px); max-width: 300px; transform: none; padding: 4px 8px; }
+  #hudBuffs { flex-direction: row; flex-wrap: wrap; gap: 3px; margin-top: 3px; width: 0; min-width: 100%; }   /* wraps inside the card, never widens it */
+  .buff { font-size: 11px; padding: 0 5px; border-radius: 8px; }
+  #hud #objective { padding: 4px 8px; }
   #hud .objTop { font-size: 12.5px; line-height: 1.05; gap: 5px; }
   .objIcon { font-size: 14px; }
   #objSub { font-size: 10.5px; }
@@ -244,20 +246,21 @@ textarea { width: 100%; height: 90px; background: var(--pn2); color: var(--cream
 }
 /* narrow game view (side panel open on a smallish window): stack the objective under the money card */
 @container stage (max-width: 760px) and (min-width: 1px) {
-  #objective { top: 112px; left: 10px; right: 62px; width: auto; transform: none; padding: 6px 10px; }
+  #objective { padding: 6px 10px; }
   .objTop { font-size: 16px; }
-  #altMeter { top: 190px; }
 }
 @container stage (max-height: 560px) {
   #altMeter { display: none; }
 }
 /* short game view (phone landscape, small laptop windows): one compact HUD row */
 @container stage (max-height: 480px) {
-  #hudLeft { top: 6px; left: 6px; padding: 4px 8px; min-width: 0; width: 150px; }
+  #hudLeft { top: 6px; left: 6px; padding: 4px 8px; min-width: 0; }
+  #hudBuffs { flex-direction: row; flex-wrap: wrap; gap: 3px; margin-top: 3px; width: 0; min-width: 100%; }
+  .buff { font-size: 11px; padding: 0 5px; border-radius: 8px; }
   .money { font-size: 19px; }
   #hudLeft .sub { font-size: 12px; }
   .chip { font-size: 12px; padding: 0 6px; }
-  #objective { top: 6px; left: 164px; right: 52px; width: auto; transform: none; padding: 4px 8px; }
+  #objective { padding: 4px 8px; }
   .objTop { font-size: 13px; }
   .objIcon { font-size: 15px; }
   #objSub { font-size: 11px; }
@@ -4696,6 +4699,7 @@ const WORLD = (function () {
   const gS = () => (typeof G !== "undefined" && G && G.S) || null;
   const low = () => { const S = gS(); return !!(S && S.settings && (S.settings.lowfx || S.settings.perf)); };
   let VW = 800, VH = 600;                                         // viewport for look-at maths
+  let ZM = 1;                                                     // current zoom: far out, details too small to see are skipped
   const LK = { x: 0, y: 0 };                                      // reused look vector
   const C = { sky: new Map(), pal: new Map(), fog: new Map(), str: new Map(), img: {}, pat: {}, grad: {} };
   const trim = m => { if (m.size > 500) m.clear(); };
@@ -5037,7 +5041,7 @@ const WORLD = (function () {
       c.beginPath(); c.moveTo(x - 3, y0 + 2); c.lineTo(x - 4 + sw, y0 - 9); c.moveTo(x + 2, y0 + 2); c.lineTo(x + 4 + sw, y0 - 7); c.stroke();
     }
     // house + gnome stand just beyond the mountain's foot; when zoomed far out they grow so they stay visible
-    const k = Math.max(1, Math.min(10, 0.42 / zoom));
+    const k = Math.max(1, Math.min(40, 0.42 / zoom));
     const hx = cx - hwB - 150 * k, gx = cx + hwB + 62 * k;
     if (hx > -90 * k) { c.save(); c.translate(hx, y0 + 2); c.scale(k, k); cottage(c, 0, 0, t); c.restore(); }
     if (gx < W + 30 * k) { c.save(); c.translate(gx, y0 + 2); c.scale(k, k); gnome(c, 0, 0, (cx - gx) / k, t); c.restore(); }
@@ -5110,7 +5114,7 @@ const WORLD = (function () {
     ov(c, hx - side * 2, hy - 1, 1.6, 1.6, INK.C.ink, false);
   }
   function band(c, i, s, cx, W, H, ya, yb, wa, wb, t, top) {
-    const col = stratCol(i, s), st = 32, sl = (ya - yb) / Math.max(1, wb - wa);
+    const col = stratCol(i, s), st = Math.max(32, 8 / ZM), sl = (ya - yb) / Math.max(1, wb - wa);
     const room = w => mhw(top - w) - 40;           // usable half-width inside the mound at world y w
     c.beginPath();
     for (let x = -st; x <= W + st; x += st) c.lineTo(x, ya + wave(x - cx, wa));
@@ -5118,7 +5122,7 @@ const WORLD = (function () {
     c.closePath(); c.fillStyle = col.f; c.fill();
     // details on a world-space grid of rows: constant density whatever the band size, only visible rows
     const RH = 46, Y = w => ya - (w - wa) * sl;
-    for (let r = Math.floor(wa / RH); r * RH < wb; r++) {
+    if (ZM >= 0.14) for (let r = Math.floor(wa / RH); r * RH < wb; r++) {
       const wc = (r + 0.5) * RH; if (wc < wa + 8 || wc > wb - 8) continue;
       const y = Y(wc); if (y < -30 || y > H + 30) continue;
       const q = i * 7919 + r * 131;
@@ -5128,15 +5132,16 @@ const WORLD = (function () {
         c.quadraticCurveTo(sx, y + 6 + (hr(q, 4) - 0.5) * 12, sx + sw / 2, y + 6); c.stroke();
       }
       c.strokeStyle = col.d; c.lineWidth = 1.2;
-      for (let j = 0; j < 3; j++) {
+      if (ZM >= 0.3) for (let j = 0; j < 3; j++) {
         const px = cx + (hr(q + j, 5) * 2 - 1) * 470, py = y + (hr(q + j, 6) - 0.5) * RH;
         if (px > -10 && px < W + 10) ov(c, px, py, 2.5 + 4 * hr(q + j, 7), 2 + 2.5 * hr(q + j, 8), col.l, true);
       }
       const bx = cx + (hr(q, 11) * 2 - 1) * 360;
+      if (ZM < 0.22) continue;
       if (hr(q, 10) < 0.16 + Math.min(0.2, (s.n | 0) / 150) && Math.abs(bx - cx) > 30) beanBone(c, bx, y, q);
       else if (hr(q, 10) > 0.93) fossil(c, q % 3, bx, y, 9 + hr(q, 12) * 6, col, q);
     }
-    for (let j = 0; (j + 0.45) * 520 < wb - wa; j++) {          // worm tunnels (with tiny worms in tiny hats)
+    if (ZM >= 0.12) for (let j = 0; (j + 0.45) * 520 < wb - wa; j++) {          // worm tunnels (with tiny worms in tiny hats)
       const sd = i * 13 + j * 5 + 5, ty = Y(wb - (j + 0.45) * 520 + 140);
       if (ty < -40 || ty > H + 40 || wb - wa < 90) continue;
       const side = (i + j) % 2 ? 1 : -1, wty = wb - (j + 0.45) * 520 + 140, off = Math.min(210 + hr(sd, 1) * 180, room(wty) - 10);
@@ -5147,13 +5152,13 @@ const WORLD = (function () {
     for (let x = -st; x <= W + st; x += st) c.lineTo(x, yb + wave(x - cx, wb));
     c.stroke();
     const tw = Math.max(wa + 4, wb - (wb >= top - 2 ? 120 : 64)), ts = i % 2 ? 1 : -1, tX = cx + ts * Math.max(40, Math.min(95 + hr(i, 9) * 80, room(tw) - 40)), tY = Y(tw) + 8;
-    if (tY > -10 && tY < H + 90) tomb(c, tX, tY, i, s, t);
+    if (ZM >= 0.13 && tY > -10 && tY < H + 90) tomb(c, tX, tY, i, s, t);
   }
   function mound(c, v, S, W, H, cx, y0, top, t, sl) {
     const wyAt = y => (y0 - y) / sl;
     const dA = Math.max(0, top - wyAt(-40)), dB = Math.min(top, top - wyAt(H + 40));
     if (dA >= dB) return;
-    const Y = d => v.toY(top - d), st = 18, base = dB >= top;
+    const Y = d => v.toY(top - d), st = Math.max(18, 5 / ZM), base = dB >= top;
     const sidePath = (s, open) => {        // s = -1 left (top->bottom), 1 right (bottom->top)
       if (s < 0) { for (let d = dA; ; d += st) { const q = Math.min(d, dB); const x = cx - mhw(q) - mwob(q, -1); open && q === dA ? c.moveTo(x, Y(q)) : c.lineTo(x, Y(q)); if (q >= dB) break; } }
       else { for (let d = dB; ; d -= st) { const q = Math.max(d, dA); const x = cx + mhw(q) + mwob(q, 1); open && q === dB ? c.moveTo(x, Y(q)) : c.lineTo(x, Y(q)); if (q <= dA) break; } }
@@ -5213,7 +5218,7 @@ const WORLD = (function () {
   function ground(c, v, t) {
     const S = gS(); if (!S || !v || !v.toY) return;
     const W = v.W, H = v.H, cx = v.cx === undefined ? W / 2 : v.cx, gap = v.gap || GAP;
-    VW = W; VH = H;
+    VW = W; VH = H; ZM = v.zoom || 1;
     const y0 = v.toY(0), sl = y0 - v.toY(1) || 1, top = Math.max(0, S.mtn || 0) * gap, yTop = v.toY(top);
     if (yTop > H + 90) return;
     c.save(); c.lineCap = "round"; c.lineJoin = "round";
@@ -6950,7 +6955,8 @@ const GAME = {
     return [Math.max(0, lo), Math.min(G.S.n - 1, hi)];
   },
   /* zoom target: 1 normally, zooming out as the view sinks below the mountain top */
-  zoomTop: () => (G.W < 520 ? 0.85 : 1),      // normal zoom: phones draw the world a bit smaller so more fits
+  // normal zoom: narrow (phone) and short (landscape phone) views draw the world smaller so more of the tower fits
+  zoomTop: () => Math.min(1, G.W < 520 ? 0.85 : 1, Math.max(0.7, G.H / 600)),
   /* zoom follows the mountain's real width (world.js: half-width = 46 + 13.5*sqrt(depth below summit)), so it
      changes gradually as you scroll: the mountain never fills more than 2/3 of the screen (1/6 free each side),
      and near the bottom it zooms out far enough to show the house and Gnome Dave beside it */
@@ -6960,9 +6966,9 @@ const GAME = {
     const hwAt = d => 46 + 13.5 * Math.sqrt(Math.max(0, d)) + 12;
     let need = 3 * hwAt(U.clamp(mt - G.cam, 0, mt));
     const nearGround = U.clamp((420 - G.cam) / 360, 0, 1);              // fades in as the garden comes into view
-    const k = Math.max(1, Math.min(10, 0.42 / Math.max(0.05, G.zoom)));   // matches the house/gnome scaling in world.js
+    const k = Math.max(1, Math.min(40, 0.42 / Math.max(0.01, G.zoom)));   // matches the house/gnome scaling in world.js
     need = U.lerp(need, Math.max(need, 2 * hwAt(mt) + 460 * k), nearGround);
-    return U.clamp(G.W / need, 0.05, top);
+    return U.clamp(G.W / need, 0.01, top);
   },
 
   /* ---------- plant identity (new weird plants every run; past runs are remembered for the mountain) ---------- */
@@ -7398,21 +7404,25 @@ const GAME = {
 
   /* ---------- input ---------- */
   bubbleHit: [], ghost: null,
-  click(mx, my, touch) {
-    const S = G.S, fat = touch ? 14 : 0;     // fingers are bigger than cursors
-    for (let j = GAME.socks.length - 1; j >= 0; j--) {
-      const k = GAME.socks[j];
-      if (Math.hypot(mx - k.x, my - k.y) < 38 + fat) {
-        const v = ECON.sockVal(S);
-        S.soc += v; S.stats.socks++;
-        GAME.socks.splice(j, 1);
-        GAME.float("+" + U.num(v) + " 🧦", k.x, k.y, INK.C.pink);
-        GAME.flyTo("hudSocks", k.x, k.y, "sock", 1);
-        GAME.burst(k.x, k.y, INK.C.pink, 6, 1);
-        SFX.play("sock");
-        if (S.soc >= 6) UI.hint("socks", "Socks buy automation! Click a plant and spend socks so it upgrades or collects by itself.");
-        return;
-      }
+  /* moving things (socks, visitors) are caught the moment you press down, so chasing one with the mouse or a
+     finger can never turn into a drag; the nearest one under the pointer wins */
+  catchAt(mx, my, touch) {
+    const S = G.S, fat = touch ? 18 : 6;
+    let best = -1, bd = Infinity;
+    for (let j = 0; j < GAME.socks.length; j++) {
+      const k = GAME.socks[j], d = Math.hypot(mx - k.x, my - (k.y + 2));
+      if (d < 38 + fat && d < bd) { bd = d; best = j; }
+    }
+    if (best >= 0) {
+      const k = GAME.socks[best], v = ECON.sockVal(S);
+      S.soc += v; S.stats.socks++;
+      GAME.socks.splice(best, 1);
+      GAME.float("+" + U.num(v) + " 🧦", k.x, k.y, INK.C.pink);
+      GAME.flyTo("hudSocks", k.x, k.y, "sock", 1);
+      GAME.burst(k.x, k.y, INK.C.pink, 6, 1);
+      SFX.play("sock");
+      if (S.soc >= 6) UI.hint("socks", "Socks buy automation! Click a plant and spend socks so it upgrades or collects by itself.");
+      return true;
     }
     for (let j = GAME.visitors.length - 1; j >= 0; j--) {
       const o = GAME.visitors[j], [x, y] = GAME.visitorPos(o);
@@ -7422,9 +7432,14 @@ const GAME = {
         GAME.reward(o.v.rw, x, y);
         UI.toast(o.v.name + ": " + o.v.line, "visitor", 5);
         GAME.float(DATA.REWARD_NAMES[o.v.rw], x, y - 30, INK.C.gold);
-        return;
+        return true;
       }
     }
+    return false;
+  },
+  click(mx, my, touch) {
+    const fat = touch ? 14 : 0;     // fingers are bigger than cursors
+    if (GAME.catchAt(mx, my, touch)) return;
     // everything below lives in the (possibly zoomed) world: convert to virtual coordinates
     const z = G.zoom, vx = mx / z, vy = my / z, vf = fat / z;
     for (const b of GAME.bubbleHit) if (Math.hypot(vx - b.x, vy - b.y) < b.r + 10 + vf) { GAME.collect(b.i, b.x * z, b.y * z); return; }
@@ -7595,8 +7610,8 @@ const GAME = {
         ctx.stroke();
       }
       ctx.lineWidth = 2.5; ctx.strokeStyle = INK.C.ink;
-      const step = 64, s0 = Math.max(step, Math.ceil(y0 / step) * step);
-      for (let wy = s0; wy < y1 - 20; wy += step) {
+      const step = 64 * (G.zoom < 0.3 ? 2 : 1), s0 = Math.max(step, Math.ceil(y0 / step) * step);
+      if (G.zoom >= 0.15) for (let wy = s0; wy < y1 - 20; wy += step) {   // leaves (too small to see when zoomed far out)
         const k = Math.round(wy / step), d = k % 2 ? 1 : -1;
         ctx.save(); ctx.translate(wx(wy) + d * 8, GAME.toY(wy)); ctx.rotate(d * 0.95);
         INK.blob(ctx, d * 10, 0, 12, 5, "#5a8a46", true, k, 0.08); ctx.restore();
@@ -9136,11 +9151,11 @@ const TUT = {
     arrow.classList.remove("hidden");
     arrow.style.left = p[0] + "px"; arrow.style.top = p[1] + "px";
     // keep the box from covering what it points at: flip it to the top if the target sits behind it
-    const box = $("tutor"), boxTop = G.H - 56 - box.offsetHeight;
+    const box = $("tutor"), boxTop = G.H - (UI.mobile() ? 8 : 56) - box.offsetHeight;
     const low = p[1] + 90 > boxTop;
     if (low !== TUT.atTop) {
       TUT.atTop = low;
-      const ob = $("objective"), under = ob.offsetTop + ob.offsetHeight + 10;   // sit just below the objective banner
+      const ob = $("objective"), under = Math.max(UI.hudBottom || 0, ob.offsetTop + ob.offsetHeight) + 10;   // just below the HUD cards
       box.style.cssText = low ? "top:" + under + "px;bottom:auto" : "";
     }
   },
@@ -9369,16 +9384,15 @@ const UI = {
     UI.set("hudMulchN", U.num(S.mu));
     $("hudMulch").classList.toggle("hidden", !S.tm);
     // buffs
-    const bf = [];
-    if (GAME.buffs.frenzy > 0) bf.push("🔥 BEAN FRENZY x7 · " + Math.ceil(GAME.buffs.frenzy) + "s");
-    if (GAME.buffs.spit > 0) bf.push("💨 SPIT FRENZY x4 · " + Math.ceil(GAME.buffs.spit) + "s");
-    if (GAME.buffs.gold > 0) bf.push("✨ GOLDEN HOUR · " + Math.ceil(GAME.buffs.gold) + "s");
+    const bf = [], sm = G.W < 640;      // small game view: short buff labels so the money card stays narrow
+    if (GAME.buffs.frenzy > 0) bf.push((sm ? "🔥 x7 " : "🔥 BEAN FRENZY x7 · ") + Math.ceil(GAME.buffs.frenzy) + "s");
+    if (GAME.buffs.spit > 0) bf.push((sm ? "💨 x4 " : "💨 SPIT FRENZY x4 · ") + Math.ceil(GAME.buffs.spit) + "s");
+    if (GAME.buffs.gold > 0) bf.push((sm ? "✨ gold " : "✨ GOLDEN HOUR · ") + Math.ceil(GAME.buffs.gold) + "s");
     const bs = bf.join("|");
     if (UI.sig.buffs !== bs) { UI.sig.buffs = bs; $("hudBuffs").innerHTML = bf.map(b => '<span class="buff">' + b + "</span>").join(""); }
     UI.objective();
     UI.altMeter();
-    const ob = $("objective"), hl = $("hudLeft");
-    UI.hudBottom = Math.max(ob.offsetTop + ob.offsetHeight, hl.offsetTop + hl.offsetHeight);
+    UI.layoutHud();
     // badges
     const qd = S.quests.filter(q => q.done).length;
     UI.set("qBadge", qd ? qd + "" : "", undefined, qd ? "on" : "");
@@ -9389,6 +9403,38 @@ const UI = {
     else if (UI.tab === "compost") UI.updCompost();
     else if (UI.tab === "stuff") UI.updStuff();
     UI.updMenu();
+  },
+  /* the top HUD cards can never overlap: the goal card sits between the money card and the round buttons when
+     there is room (centred if it can be), otherwise it drops below the money card */
+  layoutHud() {
+    const hud = $("hud"), hl = $("hudLeft"), ob = $("objective"), hr = $("hudRight"), gap = 6;
+    const HW = hud.clientWidth, left = hl.offsetLeft + hl.offsetWidth + gap, right = hr.offsetLeft - gap;
+    const want = Math.min(420, Math.max(230, HW * 0.46)), room = right - left, min = Math.min(want, HW < 520 ? 150 : 230);
+    let x, y, w;
+    if (room >= min) { w = Math.min(want, room); x = U.clamp((HW - w) / 2, left, right - w); y = hl.offsetTop; }
+    else { x = hl.offsetLeft; y = hl.offsetTop + hl.offsetHeight + gap; w = Math.min(want, right - x); }
+    const k = x + "|" + y + "|" + w;
+    if (UI.sig.hud !== k) {
+      UI.sig.hud = k;
+      Object.assign(ob.style, { left: x + "px", top: y + "px", width: w + "px", right: "auto", transform: "none" });
+    }
+    UI.hudBottom = Math.max(ob.offsetTop + ob.offsetHeight, hl.offsetTop + hl.offsetHeight, hr.offsetTop + 46);
+    // the alt meter starts below whatever is on the right
+    const am = $("altMeter"); if (am.offsetParent) am.style.top = Math.max(hr.offsetTop + hr.offsetHeight, UI.hudBottom) + 14 + "px";
+    UI.layoutBottom();
+  },
+  /* bottom of the game view: the docked plant menu sits above Wormsley's tips, and toasts float above both */
+  layoutBottom() {
+    const st = $("stage").getBoundingClientRect(), tu = $("tutor"), m = $("plantMenu"), ts = $("toasts");
+    const tr = tu.getBoundingClientRect(), tutH = tu.classList.contains("hidden") || tr.top < st.top + st.height / 2 ? 0 : st.bottom - tr.top + 2;
+    const docked = m.classList.contains("docked") && !m.classList.contains("hidden");
+    if (docked) m.style.bottom = (tutH ? tutH + 8 : 6) + "px";
+    let b = innerHeight - st.bottom + (UI.mobile() ? 12 : (G.H > 480 ? 58 : 12));
+    if (tutH) b = Math.max(b, innerHeight - tr.top + 8);
+    if (docked) b = Math.max(b, innerHeight - m.getBoundingClientRect().top + 8);
+    ts.style.bottom = b + "px";
+    ts.style.left = (st.left + st.width / 2) + "px";
+    ts.style.width = Math.min(520, st.width - 16) + "px";
   },
   objective() {
     const S = G.S, k = S.zone + 1, z = ZONES.get(k), alt = ECON.alt(S);
@@ -9588,23 +9634,32 @@ const UI = {
   },
   placeMenu() {
     const i = GAME.sel, m = $("plantMenu");
-    if (i < 0 || m.classList.contains("hidden")) return;
+    if (i < 0 || m.classList.contains("hidden")) { m._sel = -1; return; }
     const dock = UI.mobile() || G.W < 520;     // small screens: menu docks to the bottom instead of floating
     m.classList.toggle("docked", dock);
-    if (dock) { m.style.visibility = "visible"; return; }
+    if (dock) {
+      m.style.visibility = "visible"; if (!m._dk) { m._dk = 1; UI.layoutBottom(); }
+      if (m._sel !== i) {       // nudge the camera so the chosen plant isn't hidden behind the docked menu
+        m._sel = i;
+        const sy = GAME.toY(GAME.plantWY(i)) * G.zoom, mt = m.offsetTop, want = Math.max((UI.hudBottom || 0) + 70, mt - 80);
+        if (sy > mt - 50) { G.follow = false; G.camTo = U.clamp(G.cam - (sy - want) / G.zoom, -90, GAME.camMax()); }
+      }
+      return;
+    }
+    m._dk = 0; m.style.bottom = "";
     const sx = GAME.plantSX(i), sy = GAME.toY(GAME.plantWY(i)), w = 240;
     if (sy < -40 || sy > G.H + 40) { m.style.visibility = "hidden"; return; }
     m.style.visibility = "visible";
     const left = GAME.side(i) > 0 ? (sx + 60 + w < G.W ? sx + 60 : sx - 60 - w) : (sx - 60 - w > 0 ? sx - 60 - w : sx + 60);
     m.style.left = U.clamp(left, 6, G.W - w - 6) + "px";
-    m.style.top = U.clamp(sy - 80, 6, G.H - m.offsetHeight - 50) + "px";
+    m.style.top = U.clamp(sy - 80, (UI.hudBottom || 0) + 6, Math.max((UI.hudBottom || 0) + 6, G.H - m.offsetHeight - 50)) + "px";
   },
 };
 
 </script>
 <script>/* js/main.js */
 /* Gerald Wants Up — boot, title screen, main loop, camera, input, offline, autosave. */
-const G = { S: null, T: 0, W: 800, H: 600, vW: 800, vH: 600, zoom: 1, cam: 0, camTo: null, follow: true, mouse: { x: 0, y: 0, in: false },
+const G = { S: null, T: 0, W: 800, H: 600, vW: 800, vH: 600, zoom: 1, cam: 0, camTo: null, follow: true, fling: 0, mouse: { x: 0, y: 0, in: false },
   canvas: null, ctx: null, started: false, wiping: false };
 
 const MAIN = {
@@ -9684,6 +9739,10 @@ const MAIN = {
       if (Math.abs(G.zoom - zt) < 0.002) G.zoom = zt;
       G.vW = G.W / G.zoom; G.vH = G.H / G.zoom;
       const mx = GAME.camMax();
+      if (G.fling) {        // touch flick momentum
+        if (G.follow || G.camTo !== null || MAIN.drag) G.fling = 0;
+        else { G.cam += G.fling * dt; G.fling *= Math.exp(-3.2 * dt); if (Math.abs(G.fling) < 30) G.fling = 0; if (G.cam >= mx - 30 && G.fling > 0) { G.fling = 0; G.follow = true; } }
+      }
       if (G.follow) G.cam += (GAME.camFollow() - G.cam) * Math.min(1, dt * 3);
       else if (G.camTo !== null) { G.cam += (G.camTo - G.cam) * Math.min(1, dt * 4); if (Math.abs(G.camTo - G.cam) < 2) G.camTo = null; }
       G.cam = U.clamp(G.cam, -90, mx);   // a little below 0 so the roots clear the news ticker
@@ -9723,9 +9782,10 @@ const MAIN = {
     const cv = G.canvas;
     cv.addEventListener("pointerdown", e => {
       if (UI.mobile() && $("panel").classList.contains("open")) UI.sheet(false);   // tapping the game closes the sheet
-      const [x, y] = MAIN.pt(e);
-      MAIN.drag = { x, y, cam: G.cam, moved: false };
-      G.mouse.x = x; G.mouse.y = y; G.mouse.in = true;
+      const [x, y] = MAIN.pt(e), touch = e.pointerType !== "mouse";
+      G.mouse.x = x; G.mouse.y = y; G.mouse.in = true; G.fling = 0;
+      if (G.started && !CINE.active && GAME.catchAt(x, y, touch)) { MAIN.drag = null; return; }   // socks: caught on press
+      MAIN.drag = { x, y, ly: y, lt: performance.now(), v: 0, moved: false, tol: touch ? 11 : 7 };
       cv.setPointerCapture(e.pointerId);
     });
     cv.addEventListener("pointermove", e => {
@@ -9733,19 +9793,27 @@ const MAIN = {
       G.mouse.x = x; G.mouse.y = y; G.mouse.in = true;
       const d = MAIN.drag;
       if (d) {
-        if (Math.abs(y - d.y) > 7 || Math.abs(x - d.x) > 7) d.moved = true;
-        if (d.moved) { G.follow = false; G.camTo = null; G.cam = U.clamp(d.cam + (y - d.y) / G.zoom, -90, GAME.camMax()); if (G.cam >= GAME.camMax() - 30) G.follow = true; }
+        if (Math.abs(y - d.y) > d.tol || Math.abs(x - d.x) > d.tol) d.moved = true;
+        if (d.moved) {
+          // relative to the last move (not the press point), so the camera never runs away while the zoom changes
+          const now = performance.now(), dy = (y - d.ly) / G.zoom, dt = Math.max(1, now - d.lt) / 1000;
+          d.v = d.v * 0.5 + (dy / dt) * 0.5; d.ly = y; d.lt = now;
+          G.follow = false; G.camTo = null; G.cam = U.clamp(G.cam + dy, -90, GAME.camMax());
+          if (G.cam >= GAME.camMax() - 30) G.follow = true;
+        }
       }
     });
     cv.addEventListener("pointerup", e => {
       const d = MAIN.drag; MAIN.drag = null;
-      if (d && !d.moved && G.started && !CINE.active) { const [x, y] = MAIN.pt(e); GAME.click(x, y, e.pointerType !== "mouse"); }
+      if (!d) return;
+      if (!d.moved) { if (G.started && !CINE.active) { const [x, y] = MAIN.pt(e); GAME.click(x, y, e.pointerType !== "mouse"); } }
+      else if (performance.now() - d.lt < 90 && Math.abs(d.v) > 250 && !G.follow) G.fling = U.clamp(d.v, -9000, 9000);   // flick to keep scrolling
     });
     cv.addEventListener("pointercancel", () => (MAIN.drag = null));
     cv.addEventListener("pointerleave", () => { if (!MAIN.drag) G.mouse.in = false; });
     cv.addEventListener("wheel", e => {
       e.preventDefault();
-      G.follow = false; G.camTo = null;
+      G.follow = false; G.camTo = null; G.fling = 0;
       G.cam = U.clamp(G.cam - e.deltaY / G.zoom, -90, GAME.camMax());
       if (G.cam >= GAME.camMax() - 30) G.follow = true;
     }, { passive: false });

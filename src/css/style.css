@@ -37,7 +37,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #hudBuffs { display: flex; flex-direction: column; gap: 3px; margin-top: 5px; }
 .buff { font: 15px var(--display); color: var(--ink); background: var(--gold); border: 2px solid var(--ink); border-radius: 10px; padding: 1px 8px; animation: pul .8s infinite alternate; }
 @keyframes pul { to { transform: scale(1.05) rotate(-1deg); } }
-#objective { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: min(420px, 46%); text-align: left; cursor: pointer; }
+#objective { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: min(420px, 46%); text-align: left; cursor: pointer; }   /* placed by UI.layoutHud */
 #objective:hover { filter: brightness(1.15); }
 .objTop { display: flex; gap: 8px; align-items: center; font: 18px/1.1 var(--display); color: var(--gold); letter-spacing: .3px; }
 .objIcon { font-size: 20px; }
@@ -195,7 +195,9 @@ textarea { width: 100%; height: 90px; background: var(--pn2); color: var(--cream
   #hudLeft .sub { font-size: 12px; }
   .chips { gap: 4px; margin-top: 2px; }
   .chip { font-size: 12px; padding: 0 6px; }
-  #hud #objective { top: 6px; left: auto; right: 48px; width: calc(100% - 178px); max-width: 300px; transform: none; padding: 4px 8px; }
+  #hudBuffs { flex-direction: row; flex-wrap: wrap; gap: 3px; margin-top: 3px; width: 0; min-width: 100%; }   /* wraps inside the card, never widens it */
+  .buff { font-size: 11px; padding: 0 5px; border-radius: 8px; }
+  #hud #objective { padding: 4px 8px; }
   #hud .objTop { font-size: 12.5px; line-height: 1.05; gap: 5px; }
   .objIcon { font-size: 14px; }
   #objSub { font-size: 10.5px; }
@@ -228,20 +230,21 @@ textarea { width: 100%; height: 90px; background: var(--pn2); color: var(--cream
 }
 /* narrow game view (side panel open on a smallish window): stack the objective under the money card */
 @container stage (max-width: 760px) and (min-width: 1px) {
-  #objective { top: 112px; left: 10px; right: 62px; width: auto; transform: none; padding: 6px 10px; }
+  #objective { padding: 6px 10px; }
   .objTop { font-size: 16px; }
-  #altMeter { top: 190px; }
 }
 @container stage (max-height: 560px) {
   #altMeter { display: none; }
 }
 /* short game view (phone landscape, small laptop windows): one compact HUD row */
 @container stage (max-height: 480px) {
-  #hudLeft { top: 6px; left: 6px; padding: 4px 8px; min-width: 0; width: 150px; }
+  #hudLeft { top: 6px; left: 6px; padding: 4px 8px; min-width: 0; }
+  #hudBuffs { flex-direction: row; flex-wrap: wrap; gap: 3px; margin-top: 3px; width: 0; min-width: 100%; }
+  .buff { font-size: 11px; padding: 0 5px; border-radius: 8px; }
   .money { font-size: 19px; }
   #hudLeft .sub { font-size: 12px; }
   .chip { font-size: 12px; padding: 0 6px; }
-  #objective { top: 6px; left: 164px; right: 52px; width: auto; transform: none; padding: 4px 8px; }
+  #objective { padding: 4px 8px; }
   .objTop { font-size: 13px; }
   .objIcon { font-size: 15px; }
   #objSub { font-size: 11px; }
