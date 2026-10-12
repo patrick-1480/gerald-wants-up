@@ -5,7 +5,7 @@ A desktop (Electron) copy of the web game with Steam built in:
 - **Your Steam account is linked automatically.** Start the game while signed in to Steam and the title screen says
   "Playing as *your name* on Steam"; Settings shows your name, Steam ID and cloud status. (Steam games don't have a
   separate "link account" step: the game uses whoever is signed in to the Steam app.)
-- **26 achievements** (`app/js/steam.js` → `STEAM.ACH`), with icons in `art/achievements/`.
+- **26 achievements** (`src/steam.js` → `STEAM.ACH`), with icons in `art/achievements/`.
 - **Steam Cloud saves**: the save is uploaded every 2 minutes and when you quit, and on start the newest copy wins
   (this PC, the backup file, or the cloud from another PC).
 - **Rich presence** ("Gerald is at 12,200 ft (THE MOON)" on your friends list), **Steam overlay** (Shift+Tab),
@@ -17,10 +17,11 @@ A desktop (Electron) copy of the web game with Steam built in:
 
 | Path | What |
 |---|---|
-| `app/` | the game: a clone of `../src` plus the Steam-only files `js/steam.js`, `css/steam.css`, `fonts/` |
+| `src/` | Steam-only game code: `steam.js` (account, achievements, cloud, Steam clock) and `steam.css` |
+| `app/` | the built game: `../src` + `src/steam.js` in one protected `js/game.js`, plus css and fonts (made by `npm run sync`) |
 | `main.js` | Electron main process: window, Steam connection (steamworks.js), saves, achievements |
 | `preload.js` | the bridge the game page uses (`window.steamBridge`) |
-| `tools/sync.js` | re-clones `../src` into `app/` (Steam-only files are kept) |
+| `tools/sync.js` | builds `app/` (needs `npm install` once in the parent folder for the build tools) |
 | `tools/art.html` | app icon + achievement icons, drawn by the game's code (`npm run art` to save them) |
 | `build/icon.png` | app icon used for the .exe |
 | `steampipe/app_build.vdf` | upload script for Steam |
@@ -38,7 +39,16 @@ npm run art        # open http://127.0.0.1:8790 and press "Save all" to re-make 
 ```
 
 Gameplay changes go in `../src` (the web version), then `npm run sync`. Steam-only changes go in
-`app/js/steam.js`, `app/css/steam.css`, `main.js` or `preload.js`.
+`src/steam.js`, `src/steam.css`, `main.js` or `preload.js`. Don't edit `app/` by hand: it is rebuilt.
+
+## Anti-cheat
+
+- All game code is one minified closure (save + anti-cheat parts obfuscated): nothing is reachable from outside.
+- Release builds: no developer tools, debugging switches make it quit, and the game files are integrity-checked
+  (Electron fuses + ASAR integrity: change one letter and it refuses to start).
+- Saves (local, backup file and Steam Cloud) are scrambled and signed; an edited copy is ignored.
+- Offline rewards use Steam's server clock (`utils.getServerRealTime`), capped at 2 hours; changing the PC's
+  date/time does nothing. Money, socks, mulch and height are scrambled in memory (no Cheat Engine value scans).
 
 ## Putting it on Steam
 
@@ -86,5 +96,5 @@ Gameplay changes go in `../src` (the web version), then `npm run sync`. Steam-on
 | ACH_HATS | Hat Trick | Collect 10 hats for Gerald |
 | ACH_RELICS | Collector | Find 10 relics |
 
-Adding an achievement: add a row to `STEAM.ACH` in `app/js/steam.js` and to the `ACH` list in `tools/art.html`, make
+Adding an achievement: add a row to `STEAM.ACH` in `src/steam.js` and to the `ACH` list in `tools/art.html`, make
 its icons with `npm run art`, and add it in Steamworks.

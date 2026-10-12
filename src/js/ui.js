@@ -130,6 +130,7 @@ const UI = {
       '<div class="toggle">Plants talk <input type="checkbox" id="setChat"' + (s.chatter ? " checked" : "") + "></div>" +
       '<div class="toggle">Screen shake <input type="checkbox" id="setShake"' + (s.shake ? " checked" : "") + "></div>" +
       '<div class="toggle">Scientific notation <input type="checkbox" id="setSci"' + (s.sci ? " checked" : "") + "></div>" +
+      '<div class="toggle">Metric units (metres / km) <input type="checkbox" id="setMetric"' + (s.metric ? " checked" : "") + "></div>" +
       '<div class="toggle">Low effects (for slow computers) <input type="checkbox" id="setLow"' + (s.lowfx ? " checked" : "") + "></div>" +
       "<h2>Save</h2><div class='dim'>The game saves itself every few seconds in this browser.</div>" +
       '<button class="btn lil wide" data-act="replay">Replay the intro</button>' +
@@ -146,6 +147,7 @@ const UI = {
     $("setChat").onchange = e => { S().chatter = e.target.checked; };
     $("setShake").onchange = e => { S().shake = e.target.checked; };
     $("setSci").onchange = e => { S().sci = e.target.checked; UI.refreshAll(); };
+    $("setMetric").onchange = e => { S().metric = e.target.checked; ZONES._c = {}; UI.refreshAll(); };   // zone texts have heights baked in
     $("setLow").onchange = e => { S().lowfx = e.target.checked; };
   },
 
@@ -342,7 +344,7 @@ const UI = {
       $("tab-quests").innerHTML =
         '<div class="objCard"><div class="dim">MAIN GOAL</div><div class="big">' + (k <= 14 ? z.obj : "Keep going up. Forever.") + "</div>" +
         '<div class="bar"><i id="qMainBar"></i></div><div class="dim" id="qMainSub"></div>' +
-        (S.zone < 6 ? '<div class="dim" style="margin-top:6px">Gerald\'s complaint must be delivered to <b style="display:inline;color:var(--gold)">THE MOON</b> at ' + U.ft(ECON.zoneAt(6)) + ". Every plant you grow is 100 ft. Composting builds a mountain under him.</div>" :
+        (S.zone < 6 ? '<div class="dim" style="margin-top:6px">Gerald\'s complaint must be delivered to <b style="display:inline;color:var(--gold)">THE MOON</b> at ' + U.ft(ECON.zoneAt(6)) + ". Every plant you grow is " + U.ft(1) + ". Composting builds a mountain under him.</div>" :
           S.zone < 14 ? '<div class="dim" style="margin-top:6px">The complaint keeps getting forwarded. Follow it.</div>' :
           '<div class="dim" style="margin-top:6px">The complaint is approved. Gerald just likes going up now. Every new layer gives a trinket.</div>') + "</div>" +
         (sp.length ? "<h2>Special Requests</h2>" + sp.map(qrow).join("") : "") +

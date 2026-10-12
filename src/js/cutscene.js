@@ -685,7 +685,7 @@ const CINE = {
       INK.label(ctx, txt, 0, fs * 0.32, fs, INK.C.ink, "center", INK.FONT, 0.01);
       ctx.restore();
       if (v.sciT == null) return;
-      const GU = ["11 ft?", "a lot", "3 giraffes", "rude to ask", "SIX"];
+      const GU = [U.metric() ? "3 m?" : "11 ft?", "a lot", "3 giraffes", "rude to ask", "SIX"];
       for (let i = 0; i < GU.length; i++) {
         const q = U.easeOutBack(U.clamp((t - v.sciT - 0.3 - i * 0.35) / 0.35, 0, 1)); if (q <= 0) continue;
         const a = i * 1.9 + 0.6, d = (70 + (i % 2) * 34) * s, lx = mx + Math.cos(a) * d * 1.3, ly = my + Math.sin(a) * d;
@@ -1309,7 +1309,7 @@ const CINE = {
   },
   /* params.ft = feet gained (number or preformatted string); params.slots also accepted */
   _fmtFt(p, q) {
-    if (typeof p.ft === "number" && isFinite(p.ft)) { const f = Math.round(p.ft * q); return (f < 1e6 ? f.toLocaleString("en-US") : U.num(f)) + " ft"; }
+    if (typeof p.ft === "number" && isFinite(p.ft)) return U.ft(p.ft * q / ECON.FT);     // feet -> slots, shown in the player's units
     if (typeof p.ft === "string") return /ft/.test(p.ft) ? p.ft : p.ft + " ft";
     if (typeof p.slots === "number") return U.ft(p.slots * q);
     return "a bit";

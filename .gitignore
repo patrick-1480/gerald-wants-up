@@ -2,3 +2,6 @@
 steam/node_modules/
 steam/dist/
 steam/steampipe/output/
+
+# web build tools
+node_modules/

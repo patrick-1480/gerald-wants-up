@@ -28,7 +28,7 @@ FOLLOW THE CURSOR. Thick dark-purple ink outlines, flat bright fills, slight wob
   canvases/gradients you could cache; keep paths simple.
 
 ## Load order (src/index.html)
-econ.js, data.js, ink.js, util.js, zones.js, audio.js, draw.js, icons.js (DRAW.questIcon), world.js, state.js, quests.js, game.js,
+econ.js, data.js, ink.js, util.js, guard.js (GUARD: sealed saves, server clock, scrambled numbers), zones.js, audio.js, draw.js, icons.js (DRAW.questIcon), world.js, state.js, quests.js, game.js,
 cutscene.js, tutorial.js, ui.js, main.js
 
 ## Already written (read them, do not edit)

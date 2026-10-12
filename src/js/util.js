@@ -32,7 +32,19 @@ const U = {
   num: x => (x <= 0 ? "0" : x < 1000 ? (x < 10 && x % 1 ? x.toFixed(1) : Math.floor(x) + "") : U.fmtLog(Math.log10(x))),
   /* money values are stored in units of 10^S.u */
   money: x => "$" + (x <= 0 ? "0" : U.fmtLog(Math.log10(x) + ((typeof G !== "undefined" && G.S && G.S.u) || 0))),
-  ft: slots => { const f = Math.max(0, Math.round(slots * 100)); return (f < 1e6 ? f.toLocaleString("en-US") : U.fmtLog(Math.log10(f))) + " ft"; },
+  /* heights: one plant ("slot") is 100 ft. Settings > Metric switches everything to m / km */
+  metric: () => typeof G !== "undefined" && !!(G && G.S && G.S.settings && G.S.settings.metric),
+  ft: slots => {
+    const f = Math.max(0, slots * 100);
+    if (U.metric()) {
+      const m = Math.round(f * 0.3048);
+      if (m < 10000) return m.toLocaleString("en-US") + " m";
+      const km = m / 1000;
+      return (km < 100 ? km.toFixed(1) : km < 1e6 ? Math.round(km).toLocaleString("en-US") : U.fmtLog(Math.log10(km))) + " km";
+    }
+    const r = Math.round(f);
+    return (r < 1e6 ? r.toLocaleString("en-US") : U.fmtLog(Math.log10(r))) + " ft";
+  },
   time(sec) {
     sec = Math.floor(sec);
     const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;

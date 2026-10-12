@@ -1,6 +1,11 @@
 /* Gerald Wants Up — save state: shape, load/save, export/import, redenomination. */
 const STATE = {
-  KEY: "gwu3",
+  KEY: "gwu4", BACKUP: "gwu4b", OLD: "gwu3",
+  // numbers that matter for cheating are kept scrambled in memory (GUARD.protect)
+  SAFE: ["m", "run", "u", "soc", "mu", "tm", "mtn", "n", "zone", "rec", "cc"],
+  /* saves (and export codes) from before saves were sealed are converted once, from the old save slot only;
+     release builds made after this date stop accepting them (otherwise anyone could hand-write an unsealed save) */
+  legacyOK: () => typeof BUILD_TIME === "undefined" || BUILD_TIME < Date.UTC(2026, 10, 1),
   fresh() {
     return {
       v: 3, sd: (Math.random() * 1e9) | 0, u: 0,
@@ -15,25 +20,49 @@ const STATE = {
       stats: { earnL: -1, beans: 0, golden: 0, socks: 0, bubbles: 0, upgrades: 0, sprouts: 0, visitors: 0,
         pokes: 0, composts: 0, time: 0, quests: 0 },
       flags: { intro: 0, tut: 0, tutStep: 0, moonGone: 0, finale: 0, hints: {} },
-      settings: { sfx: 0.7, mus: 0.4, shake: true, chatter: true, sci: false, cine: "all", music: true },
-      last: Date.now(),
+      settings: { sfx: 0.7, mus: 0.4, shake: true, chatter: true, sci: false, cine: "all", music: true, metric: false },
+      last: Date.now(), srvT: 0,   // srvT: server time of the last save (offline rewards are measured from it)
     };
   },
+  /* save text -> save object, or null if it was edited / isn't a Gerald save */
+  decode(raw, legacy) {
+    if (!raw) return null;
+    try {
+      let d = null;
+      if (GUARD.SEAL.is(raw)) d = JSON.parse(GUARD.SEAL.open(raw));
+      else if (legacy && STATE.legacyOK()) {
+        const t = String(raw).trim();
+        d = JSON.parse(t[0] === "{" ? t : decodeURIComponent(escape(atob(t))));   // old save / old export code
+      }
+      return d && typeof d === "object" && d.v === 3 ? d : null;
+    } catch (e) { return null; }
+  },
+  encode: S => GUARD.SEAL.seal(JSON.stringify(S)),
   load() {
-    let S = STATE.fresh();
+    let S = STATE.fresh(), d = null;
     try {
       const raw = localStorage.getItem(STATE.KEY);
-      if (raw) S = STATE.merge(JSON.parse(raw));
+      d = STATE.decode(raw);
+      if (raw && !d) {                     // edited outside the game: keep it aside, fall back to the backup copy
+        try { localStorage.setItem("gwu4x", raw); } catch (e) {}
+        d = STATE.decode(localStorage.getItem(STATE.BACKUP));
+        STATE.rejected = true;
+      }
+      if (!d && !raw) d = STATE.decode(localStorage.getItem(STATE.OLD), true);
+      if (d) S = STATE.merge(d);
       else if (localStorage.getItem("gwu2")) S.flags.legacy = 1;   // an old pre-weird save exists
     } catch (e) { console.warn("load failed", e); }
+    if (!d) GUARD.protect(S, STATE.SAFE);
+    GUARD.CLOCK.loaded(S.srvT || 0);
     return S;
   },
   merge(d) {
     const f = STATE.fresh(), S = Object.assign(f, d);
     for (const k of ["stats", "flags", "settings"]) S[k] = Object.assign(STATE.fresh()[k], d[k] || {});
     S.flags.hints = S.flags.hints || {};
+    for (const k of STATE.SAFE) if (!Number.isFinite(+S[k]) || S[k] < 0) S[k] = 0;   // damaged numbers
     STATE.migrate(S);
-    return S;
+    return GUARD.protect(S, STATE.SAFE);
   },
   /* perks that were removed or capped lower: give the mulch back */
   migrate(S) {
@@ -55,17 +84,25 @@ const STATE = {
     delete S.go;
     if (S.lastN === undefined) S.lastN = S.cc ? Math.max(ECON.MIN_COMPOST, ...S.strata.map(st => st.n || 0)) : 0;
   },
+  saveN: 0,
   save(S) {
-    S.last = Date.now();
-    try { localStorage.setItem(STATE.KEY, JSON.stringify(S)); } catch (e) { /* storage full or blocked */ }
+    S.last = Date.now(); S.srvT = GUARD.CLOCK.stamp();
+    try {
+      const txt = STATE.encode(S);
+      // every 12th save the previous copy becomes the backup (used if the main copy is ever damaged)
+      if (STATE.saveN++ % 12 === 0) { const cur = localStorage.getItem(STATE.KEY); if (cur && STATE.decode(cur)) localStorage.setItem(STATE.BACKUP, cur); }
+      localStorage.setItem(STATE.KEY, txt);
+      localStorage.removeItem(STATE.OLD);
+    } catch (e) { /* storage full or blocked */ }
   },
-  exportStr(S) { return btoa(unescape(encodeURIComponent(JSON.stringify(S)))); },
+  exportStr(S) { S.srvT = GUARD.CLOCK.stamp(); return STATE.encode(S); },
   importStr(str) {
-    const d = JSON.parse(decodeURIComponent(escape(atob(str.trim()))));
-    if (!d || typeof d !== "object" || d.v !== 3) throw new Error("not a Gerald save");
+    const d = STATE.decode(str, true);
+    if (!d) throw new Error("not a Gerald save (or it was edited)");
+    d.srvT = 0;                            // an imported save never pays out offline time
     return STATE.merge(d);
   },
-  wipe() { try { localStorage.removeItem(STATE.KEY); } catch (e) {} },
+  wipe() { try { for (const k of [STATE.KEY, STATE.BACKUP, STATE.OLD]) localStorage.removeItem(k); } catch (e) {} },
   /* add x money units to the all-time earned counter (kept as log10 so it never overflows) */
   addEarned(S, x) {
     if (!(x > 0)) return;

@@ -56,7 +56,7 @@
     { id: 'rain',  name: 'Sock Rain',         desc: 'Socks fall 12% more often',                              c: 4,  g: 2.4, max: 6 },
     { id: 'gold2', name: 'Golden Gut',        desc: '+1.5% golden bean chance, forever',                      c: 5,  g: 2.4, max: 6 },
     { id: 'visit', name: 'Weirdo Magnet',     desc: 'Weird visitors show up 15% more often',                 c: 5,  g: 2.6, max: 5 },
-    { id: 'away',  name: 'Night Shift',       desc: 'Offline earnings +15% and +2h cap',                      c: 4,  g: 2.2, max: 5 },
+    { id: 'away',  name: 'Night Shift',       desc: 'Offline earnings +15% (offline time counts up to 2h)',   c: 4,  g: 2.2, max: 5 },
   ];
 
   /* ---------- Zones: altitude thresholds in slots ---------- */
@@ -172,7 +172,8 @@
 
   /* ---------- offline ---------- */
   E.offRate = S => Math.min(1, (0.4 + 0.15 * E.perkL(S, 'away')) * E.relicMult(S, 'off'));
-  E.offCap = S => (8 + 2 * E.perkL(S, 'away')) * 3600;
+  E.OFF_MAX = 2 * 3600;                         // offline rewards never count more than 2 hours
+  E.offCap = S => E.OFF_MAX;
 
   /* ---------- visitors ---------- */
   E.visitInt = S => Math.max(30, 90 * 0.85 ** E.perkL(S, 'visit') / E.relicMult(S, 'visit'));

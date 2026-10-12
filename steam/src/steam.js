@@ -1,7 +1,8 @@
 /* Gerald Wants Up — Steam build only. Talks to the Electron main process through window.steamBridge (preload.js):
    the Steam account you are signed in with, achievements, Steam Cloud saves, rich presence, fullscreen, quit.
    It hooks into the shared game code from the outside (wrapping STATE / UI functions) so every other file stays
-   identical to the web version. Without Steam running (or in a plain browser) the game simply plays offline. */
+   identical to the web version. Without Steam running (or in a plain browser) the game simply plays offline.
+   Built into the same sealed closure as the rest of the game (tools/sync.js), so none of this is reachable. */
 const STEAM = {
   B: window.steamBridge || null,
   info: { ok: false, name: "", why: "not running in the Steam app" },
@@ -48,17 +49,18 @@ const STEAM = {
       let local = null; try { local = localStorage.getItem(STATE.KEY); } catch (e) {}
       let best = null, bestT = -1;
       for (const [src, raw] of [["local", local], ["file", boot.file], ["cloud", boot.cloud]]) {
-        if (!raw) continue;
-        try { const d = JSON.parse(raw); if (d && d.v === 3 && (d.last || 0) > bestT) { best = [src, raw]; bestT = d.last || 0; } } catch (e) { /* damaged copy: skip it */ }
+        const d = STATE.decode(raw);      // sealed saves only: an edited copy (local, file or cloud) is ignored
+        const t = d ? d.srvT || d.last || 0 : -1;
+        if (d && t > bestT) { best = [src, raw]; bestT = t; }
       }
       if (best && best[0] !== "local") { try { localStorage.setItem(STATE.KEY, best[1]); } catch (e) {} STEAM.loadedFrom = best[0]; }
       return load0();
     };
     STATE.save = S => {
       save0(S);
-      const now = Date.now();
-      if (STEAM.quitting) STEAM.call("writeSaveSync", JSON.stringify(S));          // closing: wait until it's written
-      else if (now - STEAM.cloudT > STEAM.CLOUD_EVERY) { STEAM.cloudT = now; STEAM.call("writeSave", JSON.stringify(S)); }
+      const now = Date.now(), sealed = () => { try { return localStorage.getItem(STATE.KEY); } catch (e) { return null; } };
+      if (STEAM.quitting) STEAM.call("writeSaveSync", sealed());          // closing: wait until it's written
+      else if (now - STEAM.cloudT > STEAM.CLOUD_EVERY) { STEAM.cloudT = now; STEAM.call("writeSave", sealed()); }
     };
     STATE.wipe = () => { wipe0(); STEAM.call("wipeSave"); };
     STEAM.cloudT = Date.now();       // first upload a couple of minutes in (a fresh boot is already in sync)
@@ -165,6 +167,9 @@ const STEAM = {
   /* ---------- boot (runs before main.js) ---------- */
   init() {
     STEAM.info = STEAM.call("info") || STEAM.info;
+    GUARD.CLOCK.src = () => STEAM.call("serverTime");     // offline time comes from Steam's servers, not the PC clock
+    if (STEAM.call("isSelftest")) window.__gwu = {   // npm run selftest only (devtools are off in release builds)
+      get G() { return G; }, get MAIN() { return MAIN; }, get UI() { return UI; }, STATE, GUARD, STEAM };
     try { STEAM.got = JSON.parse(localStorage.getItem("gwu_ach") || "{}") || {}; } catch (e) { STEAM.got = {}; }
     const have = STEAM.info.ok ? STEAM.call("unlocked", STEAM.ACH.map(a => a[0])) : null;
     if (Array.isArray(have)) for (const id of have) STEAM.got[id] = 1;

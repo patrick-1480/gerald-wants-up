@@ -4,13 +4,15 @@
 const { app, BrowserWindow, ipcMain, Menu, shell, screen } = require('electron');
 const path = require('path'), fs = require('fs');
 const pkg = require('./package.json');
-const DEV = process.argv.includes('--dev') || !app.isPackaged;
+const DEV = !app.isPackaged;          // developer tools only when running from source (npm start), never in release builds
 const APP_ID = Number(process.env.STEAM_APP_ID) || pkg.steamAppId || 480;   // 480 = Valve's test app ("Spacewar") until you have your own
 const CLOUD_FILE = 'gerald_save.json';
 const SELFTEST = process.argv.includes('--selftest');   // npm run selftest: boots, screenshots, prints Steam status, quits
 if (SELFTEST) app.setPath('userData', path.join(app.getPath('temp'), 'gerald-selftest'));   // never touches the real save
 
 if (!app.requestSingleInstanceLock()) app.exit(0);     // two copies would fight over the save
+// release builds refuse to start with debugging switches (they would let someone poke at the running game)
+if (app.isPackaged && process.argv.some(a => /^--(remote-debugging|inspect|js-flags|remote-allow)/i.test(a))) app.exit(0);
 
 /* ---------- Steam ---------- */
 let steamworks = null, client = null, why = '';
@@ -42,12 +44,15 @@ function steamInfo() {
 /* ---------- saves: a file copy next to Electron's own storage, plus Steam Cloud ---------- */
 const saveFile = () => path.join(app.getPath('userData'), 'save.json');
 function writeSave(json) {
-  if (typeof json !== 'string' || json.length > 5e6 || json[0] !== '{') return false;
+  if (typeof json !== 'string' || json.length > 5e6 || !/^GWU4\./.test(json)) return false;   // sealed saves only
   safe(() => { fs.writeFileSync(saveFile() + '.tmp', json); fs.renameSync(saveFile() + '.tmp', saveFile()); });
   if (cloudOn()) safe(() => client.cloud.writeFile(CLOUD_FILE, json));
   return true;
 }
 ipcMain.on('steam:info', e => { e.returnValue = steamInfo(); });
+// Steam's server clock (seconds since 1970): offline rewards use this, so changing the PC's date does nothing
+ipcMain.on('steam:time', e => { e.returnValue = client ? safe(() => client.utils.getServerRealTime(), null) : null; });
+ipcMain.on('app:selftest', e => { e.returnValue = SELFTEST; });
 ipcMain.on('save:boot', e => {
   e.returnValue = {
     file: safe(() => fs.readFileSync(saveFile(), 'utf8'), null),
@@ -111,10 +116,11 @@ async function selftest() {
   wc.on('console-message', (e, level, msg) => { if (level >= 2) console.log('[page]', msg); });
   await new Promise(r => wc.once('did-finish-load', r)); await wait(2500);
   const js = s => wc.executeJavaScript(s);
-  console.log('[selftest] title', await js('JSON.stringify({ steam: STEAM.info, who: document.getElementById("steamWho").textContent, fonts: document.fonts.check("20px Chewy"), unlocked: Object.keys(STEAM.got).length })'));
+  console.log('[selftest] title', await js('const { STEAM, GUARD } = window.__gwu; JSON.stringify({ steam: STEAM.info, who: document.getElementById("steamWho").textContent, fonts: document.fonts.check("20px Chewy"), unlocked: Object.keys(STEAM.got).length, steamClock: GUARD.CLOCK.src() })'));
   fs.writeFileSync(path.join(out, 'title.png'), (await wc.capturePage()).toPNG());
-  await js('G.S.flags.intro = 1; G.S.flags.tut = 1; MAIN.start(); UI.closeModal(); UI.setTab("settings"); true'); await wait(2500);
-  console.log('[selftest] game', await js('JSON.stringify({ started: G.started, ach: document.getElementById("stAchN").textContent, sub: document.getElementById("stSub").textContent })'));
+  await js('{ const { G, MAIN, UI } = window.__gwu; G.S.flags.intro = 1; G.S.flags.tut = 1; MAIN.start(); setTimeout(() => { UI.closeModal(); UI.setTab("settings"); }, 800); true }'); await wait(3000);
+  console.log('[selftest] game', await js('{ const { G, GUARD } = window.__gwu; JSON.stringify({ started: G.started, ach: document.getElementById("stAchN").textContent, sub: document.getElementById("stSub").textContent, clockSynced: !!GUARD.CLOCK.anchor, serverMinusPc: GUARD.CLOCK.anchor ? Math.round((GUARD.CLOCK.now() - Date.now()) / 1000) : null, sealed: (localStorage.getItem("gwu4") || "").slice(0, 5) }) }'));
+  console.log('[selftest] page globals reachable:', await js('["G", "GAME", "STATE", "ECON", "GUARD"].filter(n => { try { return typeof eval(n) !== "undefined"; } catch (e) { return false; } }).join(",") || "none"'));
   fs.writeFileSync(path.join(out, 'game.png'), (await wc.capturePage()).toPNG());
   console.log('[selftest] screenshots in', out);
   app.quit();

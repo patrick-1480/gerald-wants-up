@@ -5,8 +5,13 @@ plants; every bonk pays. He is climbing to the Moon to file a complaint, and the
 forwards it, past the Sun, off the edge of the map, behind the universe, and up forever.
 
 ## Play
-- Shareable single file: `Gerald Wants Up.html` (double-click it). Build it with `node tools/build.js`.
+- Website: `public/index.html` (Render's Publish Directory must be `public`). Shareable copy: `Gerald Wants Up.html`.
+  Both are made by `npm install` (once) then `npm run build`: one protected file (all code in a closure, minified,
+  save/anti-cheat code obfuscated). Never publish `src/` (it has the readable code).
 - Dev version: `src/index.html` (served by the `gerald-wants-up` launch config on port 8777).
+- Anti-cheat (`src/js/guard.js`): saves and export codes are scrambled + signed (edited ones won't load), money/socks/
+  mulch/height are scrambled in memory, offline time comes from the server's clock (capped at 2 hours), and only
+  one copy of the game can run at a time.
 - Steam desktop version: `steam/` (Electron + Steam account, achievements, Steam Cloud). See `steam/README.md`.
   After changing `src/`, run `npm run sync` in `steam/` to copy the changes over.
 

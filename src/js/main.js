@@ -19,37 +19,65 @@ const MAIN = {
     addEventListener("beforeunload", () => { if (!G.wiping && G.started) STATE.save(G.S); });
     requestAnimationFrame(MAIN.frame);
   },
-  start() {
+  async start() {
     const S = G.S;
     SFX.init(); UI.applySound(); SFX.play("click");
+    $("btnPlay").disabled = true;
+    if (await GUARD.otherCopy()) {        // a second copy would pay the same offline time twice
+      $("btnPlay").disabled = false;
+      UI.modal("<h3>Gerald is already open</h3><div class='dim'>The game is running in another tab or window. Close that one first (or keep playing there).</div>", [["OK", null, "green"]]);
+      return;
+    }
+    GUARD.setLive(true);
     $("title").style.transition = "opacity .6s"; $("title").style.opacity = 0;
     setTimeout(() => $("title").classList.add("hidden"), 600);
     G.started = true;
     MAIN.musicCheck(true);
     if (S.flags.legacy && !S.flags.legacyGiven) { S.flags.legacyGiven = 1; S.soc += 25; setTimeout(() => UI.toast("Gerald found an old save from before he got weird. He remembers nothing. Here are 25 socks.", "zone", 6), 1500); }
+    if (STATE.rejected) setTimeout(() => UI.toast("Your save was changed outside the game, so it couldn't be trusted. Loaded the last good backup instead.", "zone", 8), 1800);
     if (S.flags.refund) { const r = S.flags.refund; S.flags.refund = 0; setTimeout(() => UI.toast("Some old perks were too strong and got retired. Wormsley refunded " + U.num(r) + " mulch.", "zone", 7), 2500); }
     if (!S.flags.intro) {
       CINE.play("intro", {}, () => { S.flags.intro = 1; STATE.save(S); TUT.start(); });
+      MAIN.offlineCheck(false);
       return;
     }
-    MAIN.welcomeBack((Date.now() - S.last) / 1000);
+    MAIN.offlineCheck(true);
     if (!S.flags.tut) TUT.start();
+  },
+  /* offline rewards use server time only (GUARD.CLOCK), never the computer's clock. If the server can't be
+     reached yet, keep trying: the away time is still owed, and playing meanwhile is never counted as away. */
+  bootPaid: false,
+  async offlineCheck(show, tries = 0) {
+    await GUARD.CLOCK.sync();
+    if (!GUARD.CLOCK.anchor) { if (tries < 20) setTimeout(() => MAIN.offlineCheck(show, tries + 1), 30000); return; }
+    if (MAIN.bootPaid) return;
+    MAIN.bootPaid = true;
+    const sec = GUARD.CLOCK.awayAtBoot();
+    if (show && sec > 0) MAIN.welcomeBack(sec);
+    if (!G.wiping) STATE.save(G.S);     // stamps the server time right away, so the same time can't be paid twice
+    setInterval(() => GUARD.CLOCK.sync(), 10 * 60 * 1000);
   },
   welcomeBack(sec) {
     const r = GAME.offline(sec);
     if (!r) return;
     const S = G.S;
-    UI.modal("<h3>Welcome back!</h3><p>You were gone for <b>" + U.time(r.sec) + "</b>" + (r.s < r.sec ? " (the plants stop counting after " + U.time(r.s) + ")" : "") + ".</p>" +
+    UI.modal("<h3>Welcome back!</h3><p>You were gone for <b>" + U.time(r.sec) + "</b>" + (r.s < r.sec ? " (the plants only count the first " + U.time(r.s) + ")" : "") + ".</p>" +
       "<p>Gerald spat <b>" + U.num(r.beans) + "</b> beans out of pure spite. The plants earned <b style='color:var(--gold)'>" + U.money(r.cash) +
       "</b> (they work at " + Math.round(ECON.offRate(S) * 100) + "% speed when nobody's watching)" + (r.socks ? " and <b>" + U.num(r.socks) + "</b> socks fell in the garden." : ".") + "</p>",
       [["Nice", () => { SFX.play("coin"); }, "green"]]);
   },
   vis() {
-    if (document.hidden) { MAIN.hiddenAt = Date.now(); if (G.started && !G.wiping) STATE.save(G.S); }   // never undo a wipe/import
-    else if (MAIN.hiddenAt && G.started) {
-      const sec = (Date.now() - MAIN.hiddenAt) / 1000; MAIN.hiddenAt = 0;
+    if (document.hidden) {
+      MAIN.hideP = performance.now(); MAIN.hideStamp = GUARD.CLOCK.stamp();
+      if (G.started && !G.wiping) STATE.save(G.S);   // never undo a wipe/import
+    } else if (MAIN.hideP && G.started) {
+      const hp = MAIN.hideP, hs = MAIN.hideStamp; MAIN.hideP = 0;
       MAIN.last = performance.now();
-      if (sec > 60) MAIN.welcomeBack(sec);
+      // server time if we can get it, otherwise the browser's own stopwatch (also immune to clock changes)
+      GUARD.CLOCK.sync().then(now => {
+        const sec = now && hs ? (now - hs) / 1000 : (performance.now() - hp) / 1000;
+        if (sec > 60 && !G.wiping) { MAIN.welcomeBack(sec); STATE.save(G.S); }
+      });
     }
   },
   resize() {

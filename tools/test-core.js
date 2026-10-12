@@ -1,6 +1,6 @@
 // Headless smoke test of the game core (econ/state/quests/game) with stubbed art/audio/UI.
 const load = require('./load.js');
-const c = load(['econ', 'data', 'ink', 'util', 'zones', 'state']);
+const c = load(['econ', 'data', 'ink', 'util', 'guard', 'zones', 'state']);
 c.run(`
 var document = { getElementById: () => null };
 var localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };

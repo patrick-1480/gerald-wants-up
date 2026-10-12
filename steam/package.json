@@ -70,7 +70,15 @@
     },
     "electronLanguages": [
       "en-US"
-    ]
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    }
   },
   "dependencies": {
     "steamworks.js": "0.4.0"

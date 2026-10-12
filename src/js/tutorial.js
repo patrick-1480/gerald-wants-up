@@ -11,7 +11,7 @@ const TUT = {
     { text: "Now grow a new plant! Click the dotted circle above the top plant, or the big green Grow button.", at: "ghost", el: "growBtn", done: S => S.n >= 2 },
     { text: "Click a plant to open its menu, then hit Upgrade. Upgraded plants pay more per bean, and reaching Lv 10 doubles them. Lv 10 is the cap for now; composting raises it later.", at: "plant0", done: S => S.stats.upgrades >= 1 },
     { text: "Socks fall out of the sky sometimes. Nobody knows whose they are. Catch that one! Socks buy automation later.", at: "sock", spawnSock: 1, done: S => S.stats.socks >= 1 },
-    { text: "Now. The point. Gerald wants to reach THE MOON to file a complaint. That's {moon} up, and every plant is 100 ft. First stop: the Clouds.", el: "objective", next: "Why?" },
+    { text: "Now. The point. Gerald wants to reach THE MOON to file a complaint. That's {moon} up, and every plant is {plant}. First stop: the Clouds.", el: "objective", next: "Why?" },
     { text: "The Moon looked at him funny. That's all I know. Weird visitors up there hand out jobs; check the Quests tab. When things slow down, call me in the Compost tab. I'll be in the dirt.", el: "tabQuests", next: "Bye, Wormsley" },
   ],
   start() {
@@ -22,7 +22,7 @@ const TUT = {
     const st = TUT.STEPS[TUT.step];
     if (!st) return TUT.finish();
     if (st.spawnSock) { GAME.socks.push({ x: G.W * 0.5, y: -30, t: 0, vy: 34, ph: 0, k: 1, seed: 7 }); }
-    TUT.say(st.text.split("{moon}").join(U.ft(ECON.zoneAt(6))), st.next ? [[st.next, () => TUT.advance()]] : [], st);
+    TUT.say(st.text.split("{moon}").join(U.ft(ECON.zoneAt(6))).split("{plant}").join(U.ft(1)), st.next ? [[st.next, () => TUT.advance()]] : [], st);
   },
   advance() {
     SFX.play("click");
