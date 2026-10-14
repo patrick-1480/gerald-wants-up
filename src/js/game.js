@@ -38,9 +38,12 @@ const GAME = {
      and near the bottom it zooms out far enough to show the house and Gnome Dave beside it */
   zoomTarget() {
     const top = GAME.zoomTop(), mt = GAME.mtnTop();
-    if (mt <= 0) return top;
+    // only when YOU scroll down into the mountain: following Gerald (a short stalk right after composting, a new
+    // planet) always stays at normal zoom, even if the mountain and the garden show at the bottom of the screen
+    if (mt <= 0 || G.follow) return top;
     const hwAt = d => 46 + 13.5 * Math.sqrt(Math.max(0, d)) + 12;
-    let need = 3 * hwAt(U.clamp(mt - G.cam, 0, mt));
+    const mid = G.cam + G.vH / 2 - GAME.base();                          // world height at the middle of the screen
+    let need = 3 * hwAt(U.clamp(mt - mid, 0, mt));     // the mountain's width at the middle of the screen (0 while you're above it)
     const nearGround = U.clamp((420 - G.cam) / 360, 0, 1);              // fades in as the garden comes into view
     const k = Math.max(1, Math.min(40, 0.42 / Math.max(0.01, G.zoom)));   // matches the house/gnome scaling in world.js
     need = U.lerp(need, Math.max(need, 2 * hwAt(mt) + 460 * k), nearGround);
